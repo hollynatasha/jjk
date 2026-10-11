@@ -11,6 +11,12 @@
     <meta name="description" content="An unofficial, fan-made webcam ritual: teach four hand signs, then cast four procedural domains. Runs entirely in your browser." />
     <meta name="theme-color" content="#000000" />
     <meta name="color-scheme" content="dark" />
+    <style>
+      /* Shown only if the app never starts, e.g. index.html opened from disk. */
+      html { background: #000; color: #efe9d6; }
+      .boot-late { opacity: 0; animation: boot-late 0.3s ease 5s forwards; }
+      @keyframes boot-late { to { opacity: 1; } }
+    </style>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Crect x='4' y='7' width='24' height='18' fill='none' stroke='%23c6ff3a' stroke-width='2.4'/%3E%3Cpath d='M9 16h14M9 20h9' stroke='%23efe9d6' stroke-width='2'/%3E%3C/svg%3E" />
   </head>
   <body>
@@ -53,7 +59,13 @@
         <p class="stage-status" id="stage-status">Stage 9:16. This frame is exactly what Save image and Record export.</p>
       </section>
 
-      <section class="panel" id="panel" aria-label="Controls" tabindex="-1"></section>
+      <section class="panel" id="panel" aria-label="Controls" tabindex="-1">
+        <div class="panel-inner" id="boot-note">
+          <p>Starting the department…</p>
+          <noscript><p>Domain Permit needs JavaScript.</p></noscript>
+          <p class="boot-late">Still here? The app did not start. It has to be served, not opened from disk: run <code>npm run dev</code> and open http://localhost:5173, or put the built <code>dist/</code> folder on an HTTPS host.</p>
+        </div>
+      </section>
 
       <section class="library" id="library" aria-labelledby="library-title">
         <div class="library-head">

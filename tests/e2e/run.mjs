@@ -192,6 +192,26 @@ async function landingAndLayout(browser) {
   }
 }
 
+// Opening the built index.html straight from disk must explain itself, not sit blank.
+async function fileOpen(browser) {
+  const file = join(ROOT, 'dist', 'index.html');
+  if (!existsSync(file)) return;
+  await step('file-open:explains', async () => {
+    const page = await browser.newPage();
+    try {
+      await page.goto(`file://${file}`, { waitUntil: 'load', timeout: 30000 });
+      await sleep(6000);
+      const r = await page.evaluate(() => {
+        const late = document.querySelector('.boot-late');
+        return { started: !!window.__domainPermit, text: late ? late.textContent.trim() : '', visible: late ? getComputedStyle(late).opacity === '1' : false };
+      });
+      record('file-open:explains', !r.started && r.visible && /npm run dev/.test(r.text), { r, note: r.started ? 'app started from file:// (unexpected)' : `app did not start; message shown: ${r.visible}` });
+    } finally {
+      await page.close();
+    }
+  });
+}
+
 async function cameraErrors(browser) {
   const cases = [
     { name: 'denied', before: null, err: { name: 'NotAllowedError' }, expect: /permission is blocked/i },
@@ -903,6 +923,7 @@ async function fakeDevice() {
 const browser = await launch();
 try {
   await landingAndLayout(browser);
+  await fileOpen(browser);
   await cameraErrors(browser);
   await simulation(browser, { tag: 'sim' });
   await simulation(browser, { tag: 'sim-reduced', reducedMotion: true });
