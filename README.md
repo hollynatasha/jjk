@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 in a current Chrome, Edge, Firefox or Safari and press **Start camera**.
+Open http://localhost:5173 in a current Chrome, Edge, Firefox or Safari and press Start camera.
 
 The camera only works on a secure page: `localhost` or HTTPS. Opening `index.html` straight from disk (`file://`) won't work, because browsers block the camera, WebAssembly loading and module scripts there. To try it on a phone, put the built `dist/` folder on any HTTPS static host or use an HTTPS tunnel to the dev server; a plain `http://192.168.x.x:5173` address is not a secure page and the browser will refuse the camera.
 
@@ -28,17 +28,14 @@ npm run preview   # serves dist/ at http://localhost:4173
 
 ## A first session
 
-1. **Start camera.** The stage shows your mirrored camera in portrait with the 21 tracked points of each hand.
-2. **Teach a sign.** The first time, the app asks for eight neutral poses (open palm, fist, peace sign, wave, relaxed hands, open palms, palms together, two fists) so it learns what is *not* a sign. Then it takes twelve captures of the sign: three facing the camera, three turned a little left, three turned a little right, then near, far and in between. A capture fires after the hands hold still for about 0.4 s; drop your hands between captures so each one is a separate attempt. The ghost diagram on the stage shows the pose.
-3. **Read the verdict.** Each sign gets one of three results, computed by leaving each capture out in turn and checking it against the rest:
-   - *Learned*
-   - *Too similar to Sukuna* (or whichever sign it collides with), for example "Megumi resembles Sukuna in 3/12 tries—separate wrists or retrain"
-   - *Hands hidden: retake*, when the tracker lost a hand or merged two
-4. **Test my signs.** Five random-order trials per trained sign, with rests in between. Anything that fires during a rest or for the wrong sign is shown as a false positive. A sign gets the green **READY** badge only from this test: at least 4 of 5, no confusions, at most one false positive.
-5. **Go live.** Hold a sign for 0.7 s. Fingertip sparks show the charge; then the domain runs for 7.5 s over the whole stage. The same sign can't fire again until you drop your hands and a 1.5 s cooldown passes. Signs that were never taught, or whose validation failed, never fire.
-6. **Result tray.** Save the peak frame as PNG, record a clip, replay the cast from its seed, or cast again.
+1. Start the camera. The stage shows your mirrored camera in portrait with the 21 tracked points of each hand.
+2. Teach a sign. The first time, the app asks for eight neutral poses (open palm, fist, peace sign, wave, relaxed hands, open palms, palms together, two fists) so it learns what is *not* a sign. Then it takes twelve captures of the sign: three facing the camera, three turned a little left, three turned a little right, then near, far and in between. A capture fires after the hands hold still for about 0.4 s; drop your hands between captures so each one is a separate attempt. The ghost diagram on the stage shows the pose.
+3. Read the verdict. Each sign gets one of three results, computed by leaving each capture out in turn and checking it against the rest: *Learned*; *Too similar to Sukuna* (or whichever sign it collides with), for example "Megumi resembles Sukuna in 3/12 tries—separate wrists or retrain"; or *Hands hidden: retake*, when the tracker lost a hand or merged two.
+4. Run Test my signs. Five random-order trials per trained sign, with rests in between. Anything that fires during a rest or for the wrong sign is shown as a false positive. A sign gets the green READY badge only from this test: at least 4 of 5, no confusions, at most one false positive.
+5. Go live. Hold a sign for 0.7 s. Fingertip sparks show the charge; then the domain runs for 7.5 s over the whole stage. The same sign can't fire again until you drop your hands and a 1.5 s cooldown passes. Signs that were never taught, or whose validation failed, never fire.
+6. Use the result tray. Save the peak frame as PNG, record a clip, replay the cast from its seed, or cast again.
 
-**Preview effects (simulation)** plays each domain on a procedural stand-in figure with a SIMULATION watermark. No hand recognition happens in simulation and nothing in it counts toward training or the READY badge.
+Preview effects (simulation) plays each domain on a procedural stand-in figure with a SIMULATION watermark. No hand recognition happens in simulation and nothing in it counts toward training or the READY badge.
 
 Keyboard: `M` mute, `E` low/high effects, `R` record (live, result or simulation), `1`–`4` play a domain in simulation, `Esc` back to the library. Every control is reachable with Tab and shows a lime focus ring.
 
@@ -51,16 +48,17 @@ Keyboard: `M` mute, `E` low/high effects, `R` record (live, result or simulation
 | Megumi | Chimera Shadow Garden | 2 | Yakushi Nyorai-in (Medicine Buddha seal), from published write-ups, plus a fingertip-only interlace | [episode 23](https://jujutsukaisen.jp/episodes/23.php) |
 | Higuruma | Deadly Sentencing | 2 | Fan-made: upright oath palm plus a flat "gavel" hand. The courtroom premise is official; the hand anatomy was not verified, so this pose is original | [episode 56](https://jujutsukaisen.jp/episodes/56.php), [characters](https://jujutsukaisen.jp/character/index.php) |
 
-The sign descriptions come from fan write-ups, not official diagrams, and each card says so. The brief mentioned an "S07 brief" with camera-practice notes; it wasn't included, so the practice tips on the cards (what the camera must see, wrist gap, steps) are written for this project. Each card also lets you record a **custom** version of the sign if your hands prefer something else.
+The sign descriptions come from fan write-ups, not official diagrams, and each card says so. The brief mentioned an "S07 brief" with camera-practice notes; it wasn't included, so the practice tips on the cards (what the camera must see, wrist gap, steps) are written for this project. Each card also lets you record a custom version of the sign if your hands prefer something else.
 
 The card drawings in `src/assets/pose-cards/` are original SVG line art generated by `scripts/build-pose-cards.mjs` from the same procedural hand model the tests use.
 
 ## Privacy and network
 
-- **Stored:** for each capture, three numeric feature vectors (67 numbers per hand plus 10 describing the pair), its label, slot and a quality summary, in IndexedDB (localStorage if IndexedDB is blocked). Never a camera frame, image or video.
-- **Training data dialog:** export everything as JSON, import it on another browser, delete one sign or everything.
-- **Network:** the page's Content-Security-Policy only allows connections to its own origin and to `https://storage.googleapis.com` (Google's MediaPipe model files). No account, API key, analytics, upload or microphone.
-- **MediaPipe version:** `@mediapipe/tasks-vision` is pinned to **0.10.35**. Releases from 1.0.0 (July 2026) on send usage metrics to Google (`odml.pa.googleapis.com`, described in that package's own privacy notice). This project rules out analytics, and 0.10.35 is the last release without that code. The CSP would block it regardless.
+For each capture the app stores three numeric feature vectors (67 numbers per hand plus 10 describing the pair), its label, slot and a quality summary, in IndexedDB (localStorage if IndexedDB is blocked). It never stores a camera frame, image or video. The Training data dialog exports everything as JSON, imports it on another browser, and deletes one sign or everything.
+
+The page's Content-Security-Policy only allows connections to its own origin and to `https://storage.googleapis.com` (Google's MediaPipe model files). There's no account, API key, analytics, upload or microphone.
+
+`@mediapipe/tasks-vision` is pinned to 0.10.35. Releases from 1.0.0 (July 2026) on send usage metrics to Google (`odml.pa.googleapis.com`, described in that package's own privacy notice). This project rules out analytics, and 0.10.35 is the last release without that code. The CSP would block it regardless.
 
 ## Models
 
@@ -71,22 +69,24 @@ The card drawings in `src/assets/pose-cards/` are original SVG line art generate
 
 `npm run fetch-models` downloads both official files into `public/models/` and records their sizes and SHA-256 hashes in `public/models/MODELS.json`; restart the dev server afterwards. With both local, the app needs no network at all.
 
-If the segmenter can't load (offline or blocked), averages more than 80 ms a frame, or gets no time because hand tracking needs every frame on a slow machine, the app switches to **effects overlay mode**: the domain is drawn over the camera image with a portal around the hands instead of behind a person cutout. Hand tracking always comes first. The status line says which mode is active and why.
+If the segmenter can't load (offline or blocked), averages more than 80 ms a frame, or gets no time because hand tracking needs every frame on a slow machine, the app switches to effects overlay mode: the domain is drawn over the camera image with a portal around the hands instead of behind a person cutout. Hand tracking always comes first. The status line says which mode is active and why.
 
 ## The domains
 
 All four share one clock: charge 0–0.25 s, rupture 0.25–1.25 s, sustained world 1.25–5.8 s, dissolve 5.8–7.5 s. Each cast is a record (domain, seed, the path the hands took), so Replay re-runs the identical sequence.
 
-- **Unlimited Void (Gojo):** a spark between index and middle fingertips, a 200 ms freeze, a thin white ring racing out from the hand, then an ultramarine ocean of parallax rings, invented glyphs and slow stars. Sound: an airy rising overtone and a glassy hit.
-- **Malevolent Shrine (Sukuna):** the midpoint between the hands becomes an ember, ink spills across the floor, a paper-cut pavilion unfolds behind you and crimson slash arcs leave torn-paper gashes and ash. Sound: brush swooshes over a low pulse.
-- **Chimera Shadow Garden (Megumi):** liquid shadow leaks from under the hands into branching pools, the room sinks into an ink garden with a teal horizon, angular animal shadows (heron, fox, ram, carp: none of them the anime's shikigami) rise and collapse, and a wave of shadow rolls toward the camera. Sound: drips, a low string texture and a swell.
-- **Deadly Sentencing (Higuruma):** an amber line folds into a courtroom frame, the room becomes a tribunal of floating paper strips, numbered stamps, witness lights and a faceless balance, a giant stamp approves Holly's R&D permit, and the tribunal crumbles back into the room. Sound: paper shuffle, a ticking pendulum and a final stamp thump.
+| Domain | What happens | Sound |
+|---|---|---|
+| Unlimited Void (Gojo) | a spark between index and middle fingertips, a 200 ms freeze, a thin white ring racing out from the hand, then an ultramarine ocean of parallax rings, invented glyphs and slow stars | an airy rising overtone and a glassy hit |
+| Malevolent Shrine (Sukuna) | the midpoint between the hands becomes an ember, ink spills across the floor, a paper-cut pavilion unfolds behind you and crimson slash arcs leave torn-paper gashes and ash | brush swooshes over a low pulse |
+| Chimera Shadow Garden (Megumi) | liquid shadow leaks from under the hands into branching pools, the room sinks into an ink garden with a teal horizon, angular animal shadows (heron, fox, ram, carp, none of them the anime's shikigami) rise and collapse, and a wave of shadow rolls toward the camera | drips, a low string texture and a swell |
+| Deadly Sentencing (Higuruma) | an amber line folds into a courtroom frame, the room becomes a tribunal of floating paper strips, numbered stamps, witness lights and a faceless balance, a giant stamp approves Holly's R&D permit, and the tribunal crumbles back into the room | paper shuffle, a ticking pendulum and a final stamp thump |
 
-**Low effects** (`E`) cuts particle counts and blur and runs segmentation less often. **Reduced motion** follows the system setting, or can be forced with the Motion button: no shake or flashes, the rupture and dissolve become slow wipes (7.9 s total), and the room is still replaced by the domain.
+Low effects (`E`) cuts particle counts and blur and runs segmentation less often. Reduced motion follows the system setting, or can be forced with the Motion button: no shake or flashes, the rupture and dissolve become slow wipes (7.9 s total), and the room is still replaced by the domain.
 
 ## Recording
 
-**Record clip** shows a 3-2-1 countdown, then records the stage canvas plus the synthesized sound with `canvas.captureStream()` and `MediaRecorder`. The next cast is recorded and the clip stops one second after the domain dissolves. The app asks for the first format the browser supports: H.264 MP4, then WebM (VP9 or VP8 with Opus). The file extension always follows the container the browser actually produced, so a WebM file is never named `.mp4`. Where `MediaRecorder` or `captureStream` is missing, the button says so and **Save PNG** still works.
+Record clip shows a 3-2-1 countdown, then records the stage canvas plus the synthesized sound with `canvas.captureStream()` and `MediaRecorder`. The next cast is recorded and the clip stops one second after the domain dissolves. The app asks for the first format the browser supports: H.264 MP4, then WebM (VP9 or VP8 with Opus). The file extension always follows the container the browser actually produced, so a WebM file is never named `.mp4`. Where `MediaRecorder` or `captureStream` is missing, the button says so and Save PNG still works.
 
 | Browser | Recording |
 |---|---|

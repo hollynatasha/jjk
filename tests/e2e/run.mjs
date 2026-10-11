@@ -349,6 +349,51 @@ async function recordingSim(browser) {
   });
 }
 
+// Training data dialog without a camera: import the synthetic sample export,
+// export it again, delete everything, import the export back.
+async function dataDialog(browser) {
+  await step('data-dialog:import-export-delete', async () => {
+    const { page, errors } = await openPage(browser, { feed: false });
+    try {
+      const counts = () => app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length, status: document.getElementById('data-status') ? document.getElementById('data-status').textContent : '' }));
+      const importFile = async (file) => {
+        await page.evaluate(() => (document.getElementById('data-status').textContent = ''));
+        await (await page.$('#import-file')).uploadFile(file);
+        await page.waitForFunction(() => /^Imported|not|malformed/i.test(document.getElementById('data-status').textContent), { timeout: 10000 });
+        return counts();
+      };
+      await page.click('#btn-data');
+      await page.waitForFunction(() => document.getElementById('data-dialog').open, { timeout: 5000 });
+      const sample = await importFile(join(ROOT, 'tests', 'fixtures', 'sample-vectors.json'));
+      const since = Date.now();
+      await clickText(page, 'Export training data', '#data-dialog button');
+      const file = await waitDownload('domain-permit-training-', 'json', since);
+      const raw = readFileSync(file, 'utf8');
+      const data = JSON.parse(raw);
+      await clickText(page, 'Delete all training data', '#data-dialog button');
+      await clickText(page, 'Press again to delete everything', '#data-dialog button');
+      await page.waitForFunction(() => window.__domainPermit.captures.length === 0, { timeout: 5000 });
+      const deleted = await counts();
+      const stored = await page.evaluate(() => new Promise((res) => {
+        const rq = indexedDB.open('holly-rd-domain-permit');
+        rq.onsuccess = () => {
+          const tx = rq.result.transaction('captures').objectStore('captures').count();
+          tx.onsuccess = () => res(tx.result);
+          tx.onerror = () => res(-1);
+        };
+        rq.onerror = () => res(-1);
+      }));
+      const back = await importFile(file);
+      await clickText(page, 'Delete all training data', '#data-dialog button');
+      await clickText(page, 'Press again to delete everything', '#data-dialog button');
+      const ok = sample.caps === 56 && sample.live === 4 && data.captures.length === 56 && !/data:image|data:video|base64|blob:/.test(raw) && deleted.caps === 0 && deleted.live === 0 && stored === 0 && back.caps === 56 && back.live === 4 && errors.length === 0;
+      record('data-dialog:import-export-delete', ok, { note: `import sample: ${sample.caps} captures, ${sample.live} live signs; export: ${data.captures.length} captures, no image data: ${!/data:image|data:video|base64|blob:/.test(raw)}; delete: ${deleted.caps} captures in the app, ${stored} in IndexedDB; re-import: ${back.caps} captures, ${back.live} live signs` });
+    } finally {
+      await page.close();
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Real pipeline with hand photos (stand-in signs)
 
@@ -781,11 +826,37 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     }
     record(`${tag}:recorded-clip`, clip.ms > 7000 && !p.error, { clip, probe: p, note: `${clip.domain} ${clip.ext} ${(clip.ms / 1000).toFixed(1)} s ${clip.mime} audio=${clip.audio}` });
 
-    // Delete training: nothing fires afterwards.
-    await app(page, () => window.__domainPermit.deleteAllTraining());
-    await sleep(300);
+    // Training data dialog: export, delete everything, import the export back.
+    await page.evaluate(() => window.__feed.clear());
+    if (await app(page, () => window.__domainPermit.mode === 'result')) await app(page, () => window.__domainPermit.goLibrary());
+    const before = await app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length }));
+    const sinceExport = Date.now();
+    await page.click('#btn-data');
+    await page.waitForFunction(() => document.getElementById('data-dialog').open, { timeout: 5000 });
+    await clickText(page, 'Export training data', '#data-dialog button');
+    const exported = await waitDownload('domain-permit-training-', 'json', sinceExport);
+    const data = JSON.parse(readFileSync(exported, 'utf8'));
+    const allowed = new Set(['id', 'kind', 'domain', 'variant', 'flipped', 'slot', 'view', 'prompt', 'handCount', 'chirality', 'vectors', 'quality', 'featureVersion', 'createdAt']);
+    const extraKeys = [...new Set(data.captures.flatMap((c) => Object.keys(c)).filter((k) => !allowed.has(k)))];
+    const raw = readFileSync(exported, 'utf8');
+    const exportOk = data.format === 'holly-rd-domain-permit/training' && data.captures.length === before.caps && extraKeys.length === 0 && !/data:image|data:video|base64|blob:/.test(raw);
+    record(`${tag}:export-training`, exportOk, { note: `${basename(exported)}: ${data.captures.length} captures, ${(raw.length / 1024).toFixed(0)} KB, extra fields ${extraKeys.length ? extraKeys.join(',') : 'none'}, image or video data: ${/data:image|data:video|base64|blob:/.test(raw) ? 'FOUND' : 'none'}` });
+
+    // Delete through the dialog (two presses): nothing fires afterwards.
+    await clickText(page, 'Delete all training data', '#data-dialog button');
+    await clickText(page, 'Press again to delete everything', '#data-dialog button');
+    await page.waitForFunction(() => window.__domainPermit.captures.length === 0, { timeout: 5000 });
     const after = await app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length }));
-    record(`${tag}:delete-training`, after.caps === 0 && after.live === 0, { note: `captures ${after.caps}, live signs ${after.live}` });
+    record(`${tag}:delete-training`, after.caps === 0 && after.live === 0, { note: `before ${before.caps} captures / ${before.live} live signs; after ${after.caps} / ${after.live}` });
+
+    // Import the export back through the file picker.
+    const input = await page.$('#import-file');
+    await input.uploadFile(exported);
+    await page.waitForFunction(() => /^Imported/.test(document.getElementById('data-status').textContent), { timeout: 10000 });
+    const restored = await app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length, status: document.getElementById('data-status').textContent }));
+    record(`${tag}:import-training`, restored.caps === before.caps && restored.live === before.live, { note: `${restored.status} live signs ${restored.live}` });
+    await clickText(page, 'Close', '#data-dialog button');
+    await app(page, () => window.__domainPermit.deleteAllTraining());
     note(`photo swaps after detector misses: ${JSON.stringify(swaps)}`);
     record(`${tag}:detector-swaps`, true, { swaps, note: `teach captures ${swaps.capture}, challenge trials ${swaps.trial}, live ${swaps.live} (harness showed another photo after the palm detector missed a hand)` });
     const bad = unexplainedErrors(errors, blocked);
@@ -928,6 +999,7 @@ try {
   await simulation(browser, { tag: 'sim' });
   await simulation(browser, { tag: 'sim-reduced', reducedMotion: true });
   await toggles(browser);
+  await dataDialog(browser);
   await recordingSim(browser);
   const feed = loadFeed();
   const guarded = async (tag, opts) => {

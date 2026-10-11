@@ -32,11 +32,20 @@ export function renderHeader(app) {
   }
 }
 
-export function renderDataDialog(app) {
+/** Builds the training-data dialog; rebuilt after an import or delete so counts and buttons stay true. */
+export function renderDataDialog(app, message = '') {
   const dlg = app.dom.dialog;
   const counts = DOMAINS.map((d) => `${d.character} ${app.positives(d.id).length}/12`).join(' · ');
   let armed = false;
-  const status = h('p', { class: 'fine', id: 'data-status', role: 'status' }, '');
+  const status = h('p', { class: 'fine', id: 'data-status', role: 'status' }, message);
+  const refresh = (msg) => {
+    renderDataDialog(app, msg);
+    const title = dlg.querySelector('#data-title');
+    if (title) {
+      title.setAttribute('tabindex', '-1');
+      title.focus();
+    }
+  };
   const del = button('Delete all training data', async () => {
     if (!armed) {
       armed = true;
@@ -45,10 +54,8 @@ export function renderDataDialog(app) {
       return;
     }
     await app.deleteAllTraining();
-    status.textContent = 'Deleted.';
-    del.textContent = 'Deleted';
-    del.disabled = true;
-  }, { kind: 'danger' });
+    refresh('Deleted. No training data is stored in this browser now.');
+  }, { kind: 'danger', disabled: app.captures.length === 0 });
   const file = h('input', {
     type: 'file',
     accept: 'application/json,.json',
@@ -59,7 +66,7 @@ export function renderDataDialog(app) {
       if (!f) return;
       try {
         const n = await app.importTraining(f);
-        status.textContent = `Imported ${n} captures.`;
+        refresh(`Imported ${n} captures.`);
       } catch (err) {
         status.textContent = err.message;
       }

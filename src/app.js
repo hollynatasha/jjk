@@ -283,8 +283,10 @@ export class App {
     const text = await file.text();
     const n = await importTraining(this.store, text, { replace: false });
     const { usable } = await loadCaptures(this.store);
+    const domains = (await this.store.getMeta('domains')) || {};
+    // Swap everything in at once so captures and matcher never disagree.
     this.captures = usable;
-    this.meta.domains = (await this.store.getMeta('domains')) || {};
+    this.meta.domains = domains;
     this.refreshMatcher();
     this.renderAll();
     announce(`Imported ${n} captures.`);
