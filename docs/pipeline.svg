@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 790" width="1240" height="790" font-family="IBM Plex Mono, ui-monospace, Menlo, Consolas, monospace">
+  <title>Domain Permit pipeline</title>
+  <desc>Camera frames go to MediaPipe hand tracking and person segmentation inside the browser tab; landmarks become feature vectors, a nearest-neighbour matcher trained on the user's own captures classifies them, a hold gate fires a seeded domain sequence, and the 9:16 stage canvas is exported as PNG or a recorded clip. Only labelled feature vectors are stored.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c6ff3a"/>
+    </marker>
+    <style>
+      .box { fill: #17130f; stroke: #efe9d6; stroke-width: 1.5; }
+      .hot { fill: #17130f; stroke: #c6ff3a; stroke-width: 2.5; }
+      .store { fill: #efe9d6; stroke: #efe9d6; }
+      .h { fill: #efe9d6; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+      .t { fill: #cfc8b3; font-size: 12.5px; }
+      .ink { fill: #17130f; }
+      .lime { fill: #c6ff3a; }
+      .edge { stroke: #c6ff3a; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #efe9d6; stroke-width: 1.5; fill: none; stroke-dasharray: 5 5; marker-end: url(#arrow); }
+      .lbl { fill: #c6ff3a; font-size: 11.5px; }
+    </style>
+  </defs>
+
+  <rect width="1240" height="790" fill="#000"/>
+  <text x="40" y="52" class="h" font-size="22">DOMAIN PERMIT · PIPELINE</text>
+  <text x="40" y="76" class="t">Everything below runs inside one browser tab. Camera frames are never stored or sent anywhere.</text>
+
+  <!-- Row 1: recognition -->
+  <rect x="40" y="110" width="200" height="120" rx="6" class="box"/>
+  <text x="56" y="138" class="h">CAMERA</text>
+  <text x="56" y="162" class="t">getUserMedia 640×480</text>
+  <text x="56" y="180" class="t">raw frames to models,</text>
+  <text x="56" y="198" class="t">mirrored once on stage</text>
+
+  <rect x="280" y="110" width="210" height="120" rx="6" class="box"/>
+  <text x="296" y="138" class="h">HAND LANDMARKER</text>
+  <text x="296" y="162" class="t">MediaPipe, VIDEO mode</text>
+  <text x="296" y="180" class="t">2 hands × 21 points</text>
+  <text x="296" y="198" class="t">≤18 fps, rising timestamps</text>
+
+  <rect x="530" y="110" width="200" height="120" rx="6" class="box"/>
+  <text x="546" y="138" class="h">FEATURES</text>
+  <text x="546" y="162" class="t">67 per hand, palm frame</text>
+  <text x="546" y="180" class="t">+10 two-hand layout</text>
+  <text x="546" y="198" class="t">both hand orders tried</text>
+
+  <rect x="770" y="110" width="210" height="120" rx="6" class="hot"/>
+  <text x="786" y="138" class="h">MATCHER</text>
+  <text x="786" y="162" class="t">nearest neighbour over</text>
+  <text x="786" y="180" class="t">Holly's own captures;</text>
+  <text x="786" y="198" class="t">per-sign threshold, margin,</text>
+  <text x="786" y="216" class="t">hand-count + handedness</text>
+
+  <rect x="1020" y="110" width="180" height="120" rx="6" class="hot"/>
+  <text x="1036" y="138" class="h">CAST GATE</text>
+  <text x="1036" y="162" class="t">hold 0.7 s</text>
+  <text x="1036" y="180" class="t">dropout ≤150 ms</text>
+  <text x="1036" y="198" class="t">cooldown 1.5 s</text>
+  <text x="1036" y="216" class="t">release to re-arm</text>
+
+  <path d="M240 170 H272" class="edge"/>
+  <path d="M490 170 H522" class="edge"/>
+  <path d="M730 170 H762" class="edge"/>
+  <path d="M980 170 H1012" class="edge"/>
+
+  <!-- Teach / test / storage -->
+  <rect x="530" y="290" width="200" height="104" rx="6" class="box"/>
+  <text x="546" y="318" class="h">TEACH</text>
+  <text x="546" y="342" class="t">8 neutral poses, then</text>
+  <text x="546" y="360" class="t">12 still captures per sign</text>
+  <text x="546" y="378" class="t">(front, left, right, 3 ranges)</text>
+
+  <rect x="770" y="290" width="210" height="104" rx="6" class="box"/>
+  <text x="786" y="318" class="h">TEST MY SIGNS</text>
+  <text x="786" y="342" class="t">5 random trials per sign,</text>
+  <text x="786" y="360" class="t">false positives counted;</text>
+  <text x="786" y="378" class="t">the only path to "ready"</text>
+
+  <rect x="530" y="440" width="450" height="64" rx="6" class="store"/>
+  <text x="548" y="467" class="h ink">INDEXEDDB (or localStorage)</text>
+  <text x="548" y="489" class="t ink">labelled feature vectors only · export / import / delete</text>
+
+  <path d="M630 230 V282" class="dash"/>
+  <path d="M630 394 V432" class="edge"/>
+  <path d="M750 440 V262 H795 V238" class="edge"/>
+  <text x="742" y="426" class="lbl" text-anchor="end">stored captures</text>
+  <path d="M875 230 V282" class="edge"/>
+  <text x="884" y="262" class="lbl">live verdicts</text>
+  <path d="M875 394 V432" class="edge"/>
+  <text x="884" y="420" class="lbl">ready badges</text>
+  <text x="640" y="262" class="lbl">features</text>
+
+  <!-- Segmentation -->
+  <rect x="40" y="290" width="200" height="104" rx="6" class="box"/>
+  <text x="56" y="318" class="h">SEGMENTER</text>
+  <text x="56" y="342" class="t">person mask every 120 ms;</text>
+  <text x="56" y="360" class="t">missing or slow model:</text>
+  <text x="56" y="378" class="t">effects overlay mode</text>
+  <path d="M140 230 V282" class="edge"/>
+
+  <!-- Cast and stage -->
+  <rect x="1020" y="290" width="180" height="104" rx="6" class="box"/>
+  <text x="1036" y="318" class="h">CAST RUN</text>
+  <text x="1036" y="342" class="t">seeded RNG + anchor</text>
+  <text x="1036" y="360" class="t">track; Replay re-runs</text>
+  <text x="1036" y="378" class="t">the same record</text>
+  <path d="M1110 230 V282" class="edge"/>
+
+  <rect x="40" y="540" width="1160" height="104" rx="6" class="hot"/>
+  <text x="58" y="570" class="h">STAGE · 720×1280 CANVAS · rAF</text>
+  <text x="58" y="594" class="t">camera crop + person cutout (or overlay portal) + domain module render(g, state, frame), all on one shared clock:</text>
+  <text x="58" y="614" class="t">charge 0–0.25 s · rupture 0.25–1.25 s · sustain 1.25–5.8 s · dissolve 5.8–7.5 s</text>
+  <text x="58" y="634" class="t lime">Unlimited Void · Malevolent Shrine · Chimera Shadow Garden · Deadly Sentencing</text>
+
+  <path d="M140 394 V532" class="edge"/>
+  <path d="M1110 394 V532" class="edge"/>
+  <path d="M260 170 V510 H420 V532" class="dash"/>
+  <text x="270" y="502" class="lbl">video frame</text>
+
+  <rect x="40" y="690" width="200" height="64" rx="6" class="store"/>
+  <text x="56" y="717" class="h ink">PNG</text>
+  <text x="56" y="739" class="t ink">peak frame, 720×1280</text>
+  <rect x="280" y="690" width="240" height="64" rx="6" class="store"/>
+  <text x="296" y="717" class="h ink">CLIP</text>
+  <text x="296" y="739" class="t ink">MediaRecorder, MP4 or WebM</text>
+  <rect x="580" y="690" width="400" height="64" rx="6" class="box"/>
+  <text x="596" y="717" class="h">WEB AUDIO</text>
+  <text x="596" y="739" class="t">synthesised per domain; mute persists</text>
+
+  <path d="M140 644 V682" class="edge"/>
+  <path d="M400 644 V682" class="edge"/>
+  <path d="M580 722 H528" class="edge"/>
+</svg>

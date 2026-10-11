@@ -1,0 +1,32 @@
+Domain Permit · Holly's R&D Department
+Unofficial fan-made project. Not affiliated with or endorsed by Gege Akutami,
+Shueisha, MAPPA, TOHO or the JUJUTSU KAISEN Production Committee.
+
+Third-party components
+----------------------
+
+MediaPipe Tasks Vision (@mediapipe/tasks-vision 0.10.35)
+  Copyright The MediaPipe Authors. Apache License 2.0.
+  https://github.com/google-ai-edge/mediapipe
+  Installed from npm; its WebAssembly files are copied into
+  public/mediapipe/wasm by scripts/copy-wasm.mjs at install time.
+
+MediaPipe Hand Landmarker model (public/models/hand_landmarker.task)
+  Copyright Google LLC. Apache License 2.0.
+  Copied unmodified from https://github.com/google-ai-edge/mediapipe-samples
+  (Apache License 2.0), commit 9cabe32bfdd0a7457e2cb1d2f29ffcf7dc24195f,
+  examples/hand_landmarker/ios/HandLandmarker/hand_landmarker.task
+  SHA-256 fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1
+
+MediaPipe Selfie Segmenter model (downloaded at runtime or by
+`npm run fetch-models`, not committed)
+  Copyright Google LLC. Apache License 2.0.
+
+Fonts, bundled through Fontsource, SIL Open Font License 1.1:
+  IBM Plex Sans and IBM Plex Mono (Copyright IBM Corp.)
+  Instrument Serif (Copyright The Instrument Serif Project Authors)
+  Caveat (Copyright The Caveat Project Authors)
+  Anton (Copyright The Anton Project Authors)
+
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+SIL Open Font License 1.1: https://openfontlicense.org

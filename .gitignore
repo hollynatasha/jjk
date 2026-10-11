@@ -1,0 +1,10 @@
+node_modules/
+dist/
+public/mediapipe/
+public/__test__/
+e2e-out/
+*.log
+.DS_Store
+# hand photos for the optional real-pipeline e2e run never go in the repo
+photos/
+boxes.json
