@@ -5,6 +5,12 @@ public/__test__/
 e2e-out/
 *.log
 .DS_Store
-# hand photos for the optional real-pipeline e2e run never go in the repo
+# hand photos for the e2e run, never committed
 photos/
 boxes.json
+# stray reference clips in the project root (public/domains/ is kept)
+/*.mp4
+remotion/node_modules/
+remotion/out/
+
+.taste-skill/

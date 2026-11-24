@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 790" width="1240" height="790" font-family="IBM Plex Mono, ui-monospace, Menlo, Consolas, monospace">
   <title>Domain Permit pipeline</title>
-  <desc>Camera frames go to MediaPipe hand tracking and person segmentation inside the browser tab; landmarks become feature vectors, a nearest-neighbour matcher trained on the user's own captures classifies them, a hold gate fires a seeded domain sequence, and the 9:16 stage canvas is exported as PNG or a recorded clip. Only labelled feature vectors are stored.</desc>
+  <desc>Domain Permit pipeline: camera, hand tracking, features, matcher, hold gate, stage.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#c6ff3a"/>
@@ -108,7 +108,7 @@
   <text x="58" y="570" class="h">STAGE · 720×1280 CANVAS · rAF</text>
   <text x="58" y="594" class="t">camera crop + person cutout (or overlay portal) + domain module render(g, state, frame), all on one shared clock:</text>
   <text x="58" y="614" class="t">charge 0–0.25 s · rupture 0.25–1.25 s · sustain 1.25–5.8 s · dissolve 5.8–7.5 s</text>
-  <text x="58" y="634" class="t lime">Unlimited Void · Malevolent Shrine · Chimera Shadow Garden · Deadly Sentencing</text>
+  <text x="58" y="634" class="t lime">Unlimited Void · Malevolent Shrine · Chimera Shadow Garden</text>
 
   <path d="M140 394 V532" class="edge"/>
   <path d="M1110 394 V532" class="edge"/>

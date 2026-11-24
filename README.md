@@ -1,136 +1,115 @@
-# Domain Permit · Holly's R&D Department
+# Domain Permit
 
-A browser webcam piece: teach four Jujutsu Kaisen domain hand signs to your own camera, prove them in a short test, then hold a sign for 0.7 s and that domain takes over a 9:16 stage you can save as a PNG or a clip.
+Teach three Jujutsu Kaisen domain hand signs to your webcam, then hold one for 0.7 s and that domain takes over the screen. Everything runs in the browser.
 
-Unofficial and fan-made. Not affiliated with or endorsed by Gege Akutami, Shueisha, MAPPA or TOHO. Every drawing, animation and sound in it is procedural code in this repository.
+Made by Holly · IG [@Hollynst](https://instagram.com/hollynst)
+
+Not affiliated with Gege Akutami, Shueisha, MAPPA or TOHO. Every drawing, animation and sound in it is drawn in code in this repo.
 
 ![Pipeline](docs/pipeline.svg)
 
 ## Run it
 
-Requires Node 20.19 or newer.
+Needs Node 20.19 or newer.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173 in a current Chrome, Edge, Firefox or Safari and press Start camera.
+Then open http://localhost:5173 and press Start camera.
 
-The camera only works on a secure page: `localhost` or HTTPS. Opening `index.html` straight from disk (`file://`) won't work, because browsers block the camera, WebAssembly loading and module scripts there. To try it on a phone, put the built `dist/` folder on any HTTPS static host or use an HTTPS tunnel to the dev server; a plain `http://192.168.x.x:5173` address is not a secure page and the browser will refuse the camera.
-
-```bash
-npm run build     # production build in dist/
-npm run preview   # serves dist/ at http://localhost:4173
-```
-
-`npm install` copies MediaPipe's WebAssembly runtime from `node_modules` into `public/mediapipe/wasm` (`scripts/copy-wasm.mjs`), so nothing loads from a CDN.
-
-## A first session
-
-1. Start the camera. The stage shows your mirrored camera in portrait with the 21 tracked points of each hand.
-2. Teach a sign. The first time, the app asks for eight neutral poses (open palm, fist, peace sign, wave, relaxed hands, open palms, palms together, two fists) so it learns what is *not* a sign. Then it takes twelve captures of the sign: three facing the camera, three turned a little left, three turned a little right, then near, far and in between. A capture fires after the hands hold still for about 0.4 s; drop your hands between captures so each one is a separate attempt. The ghost diagram on the stage shows the pose.
-3. Read the verdict. Each sign gets one of three results, computed by leaving each capture out in turn and checking it against the rest: *Learned*; *Too similar to Sukuna* (or whichever sign it collides with), for example "Megumi resembles Sukuna in 3/12 tries—separate wrists or retrain"; or *Hands hidden: retake*, when the tracker lost a hand or merged two.
-4. Run Test my signs. Five random-order trials per trained sign, with rests in between. Anything that fires during a rest or for the wrong sign is shown as a false positive. A sign gets the green READY badge only from this test: at least 4 of 5, no confusions, at most one false positive.
-5. Go live. Hold a sign for 0.7 s. Fingertip sparks show the charge; then the domain runs for 7.5 s over the whole stage. The same sign can't fire again until you drop your hands and a 1.5 s cooldown passes. Signs that were never taught, or whose validation failed, never fire.
-6. Use the result tray. Save the peak frame as PNG, record a clip, replay the cast from its seed, or cast again.
-
-Preview effects (simulation) plays each domain on a procedural stand-in figure with a SIMULATION watermark. No hand recognition happens in simulation and nothing in it counts toward training or the READY badge.
-
-Keyboard: `M` mute, `E` low/high effects, `R` record (live, result or simulation), `1`–`4` play a domain in simulation, `Esc` back to the library. Every control is reachable with Tab and shows a lime focus ring.
-
-## The four signs
-
-| Character | Domain | Hands | Sign | Official reference |
-|---|---|---|---|---|
-| Gojo | Unlimited Void | 1 | Taishakuten-in (Indra seal), from published write-ups, plus a camera-friendly variant | [episode 7](https://jujutsukaisen.jp/episodes/07.php) |
-| Sukuna | Malevolent Shrine | 2 | Enma-ten-in (Yama seal), from published write-ups, plus a variant with a finger-width gap | [episode 41](https://jujutsukaisen.jp/episodes/41.php) |
-| Megumi | Chimera Shadow Garden | 2 | Yakushi Nyorai-in (Medicine Buddha seal), from published write-ups, plus a fingertip-only interlace | [episode 23](https://jujutsukaisen.jp/episodes/23.php) |
-| Higuruma | Deadly Sentencing | 2 | Fan-made: upright oath palm plus a flat "gavel" hand. The courtroom premise is official; the hand anatomy was not verified, so this pose is original | [episode 56](https://jujutsukaisen.jp/episodes/56.php), [characters](https://jujutsukaisen.jp/character/index.php) |
-
-The sign descriptions come from fan write-ups, not official diagrams, and each card says so. The brief mentioned an "S07 brief" with camera-practice notes; it wasn't included, so the practice tips on the cards (what the camera must see, wrist gap, steps) are written for this project. Each card also lets you record a custom version of the sign if your hands prefer something else.
-
-The card drawings in `src/assets/pose-cards/` are original SVG line art generated by `scripts/build-pose-cards.mjs` from the same procedural hand model the tests use.
-
-## Privacy and network
-
-For each capture the app stores three numeric feature vectors (67 numbers per hand plus 10 describing the pair), its label, slot and a quality summary, in IndexedDB (localStorage if IndexedDB is blocked). It never stores a camera frame, image or video. The Training data dialog exports everything as JSON, imports it on another browser, and deletes one sign or everything.
-
-The page's Content-Security-Policy only allows connections to its own origin and to `https://storage.googleapis.com` (Google's MediaPipe model files). There's no account, API key, analytics, upload or microphone.
-
-`@mediapipe/tasks-vision` is pinned to 0.10.35. Releases from 1.0.0 (July 2026) on send usage metrics to Google (`odml.pa.googleapis.com`, described in that package's own privacy notice). This project rules out analytics, and 0.10.35 is the last release without that code. The CSP would block it regardless.
-
-## Models
-
-| Model | Where it comes from | Notes |
-|---|---|---|
-| Hand Landmarker | `public/models/hand_landmarker.task`, 7,819,105 bytes, SHA-256 `fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1`, copied from [google-ai-edge/mediapipe-samples](https://github.com/google-ai-edge/mediapipe-samples) at commit `9cabe32bfdd0a7457e2cb1d2f29ffcf7dc24195f`, path `examples/hand_landmarker/ios/HandLandmarker/hand_landmarker.task` (Apache-2.0) | Fallback: [official file](https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task) |
-| Selfie Segmenter | [official file](https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite), fetched at runtime | Cuts the person out so the domain can sit behind them |
-
-`npm run fetch-models` downloads both official files into `public/models/` and records their sizes and SHA-256 hashes in `public/models/MODELS.json`; restart the dev server afterwards. With both local, the app needs no network at all.
-
-If the segmenter can't load (offline or blocked), averages more than 80 ms a frame, or gets no time because hand tracking needs every frame on a slow machine, the app switches to effects overlay mode: the domain is drawn over the camera image with a portal around the hands instead of behind a person cutout. Hand tracking always comes first. The status line says which mode is active and why.
-
-## The domains
-
-All four share one clock: charge 0–0.25 s, rupture 0.25–1.25 s, sustained world 1.25–5.8 s, dissolve 5.8–7.5 s. Each cast is a record (domain, seed, the path the hands took), so Replay re-runs the identical sequence.
-
-| Domain | What happens | Sound |
-|---|---|---|
-| Unlimited Void (Gojo) | a spark between index and middle fingertips, a 200 ms freeze, a thin white ring racing out from the hand, then an ultramarine ocean of parallax rings, invented glyphs and slow stars | an airy rising overtone and a glassy hit |
-| Malevolent Shrine (Sukuna) | the midpoint between the hands becomes an ember, ink spills across the floor, a paper-cut pavilion unfolds behind you and crimson slash arcs leave torn-paper gashes and ash | brush swooshes over a low pulse |
-| Chimera Shadow Garden (Megumi) | liquid shadow leaks from under the hands into branching pools, the room sinks into an ink garden with a teal horizon, angular animal shadows (heron, fox, ram, carp, none of them the anime's shikigami) rise and collapse, and a wave of shadow rolls toward the camera | drips, a low string texture and a swell |
-| Deadly Sentencing (Higuruma) | an amber line folds into a courtroom frame, the room becomes a tribunal of floating paper strips, numbered stamps, witness lights and a faceless balance, a giant stamp approves Holly's R&D permit, and the tribunal crumbles back into the room | paper shuffle, a ticking pendulum and a final stamp thump |
-
-Low effects (`E`) cuts particle counts and blur and runs segmentation less often. Reduced motion follows the system setting, or can be forced with the Motion button: no shake or flashes, the rupture and dissolve become slow wipes (7.9 s total), and the room is still replaced by the domain.
-
-## Recording
-
-Record clip shows a 3-2-1 countdown, then records the stage canvas plus the synthesized sound with `canvas.captureStream()` and `MediaRecorder`. The next cast is recorded and the clip stops one second after the domain dissolves. The app asks for the first format the browser supports: H.264 MP4, then WebM (VP9 or VP8 with Opus). The file extension always follows the container the browser actually produced, so a WebM file is never named `.mp4`. Where `MediaRecorder` or `captureStream` is missing, the button says so and Save PNG still works.
-
-| Browser | Recording |
-|---|---|
-| Chromium (tested here, headless) | MP4, H.264 video + Opus audio |
-| Chrome / Edge desktop | expected the same; not tested on a real install |
-| Firefox | expected WebM; not tested |
-| Safari 14.1+ | expected MP4; not tested |
-
-## Tests
+The camera only works on `localhost` or HTTPS, so opening `index.html` from your file manager will not work.
 
 ```bash
-npm test            # unit tests (vitest), synthetic hands only
-npm run test:e2e    # browser tests; needs CHROME_PATH=/path/to/chrome or chromium
+npm run build     # production build into dist/
+npm run preview   # serve dist/ at http://localhost:4173
+npm test          # unit tests
 ```
 
-The 82 unit tests cover accept and reject cases, scale, mirroring, rotation, dropped frames, the hold, cooldown and re-arm, deletion, a deliberately confusable Megumi/Sukuna pair, capture hand-off between prompts, replay determinism, unique animations per domain, the 9:16 mapping and the exported data format (`tests/fixtures/sample-vectors.json` is a synthetic export, regenerated with `npm run vectors`).
+## How to use it
 
-The browser tests check layout at 1440 px and 390 px, every camera error, simulation in normal and reduced motion, settings persistence, keyboard access, recording and PNG export, third-party requests and a real `getUserMedia` fake device. Given hand photos, they also drive the real MediaPipe pipeline through a canvas "camera":
+1. Press **Teach this sign** on a card. It starts the camera, asks for eight neutral poses the first time, then takes twelve captures of the sign from different angles.
+2. Press **Test my signs**. Five tries per sign. A sign gets the green READY badge at 4/5 with no mix-ups.
+3. Hold a sign for 0.7 s. The domain runs for 7.5 s, then you can save a PNG, record a clip or replay it.
 
-```bash
-CHROME_PATH=/path/to/chrome npm run test:e2e -- --feed-dir photos/ --feed-boxes boxes.json
+**Preview effects (simulation)** plays the animations on a stand-in figure without the camera.
+
+Keys: `M` mute, `E` effects quality, `R` record, `1`–`3` preview a domain, `Esc` back.
+
+## The three signs
+
+| Character | Domain | Hands | Sign |
+|---|---|---|---|
+| Gojo | Unlimited Void | 1 | Index finger up, middle finger hooked over it |
+| Sukuna | Malevolent Shrine | 2 | Middle and ring fingers raised into a peak, palms a finger apart |
+| Megumi | Chimera Shadow Garden | 2 | Fingertips interlaced, thumbs up, palms ~5 cm apart |
+
+They come from published write-ups of the real signs, adjusted so the camera can see both hands. Each card has the full steps and a link to the official episode page.
+
+## Privacy
+
+Camera frames never leave the tab and are never saved. The only thing stored is the numbers describing your hand shapes, in IndexedDB, which you can export or delete from the **Training data** dialog. There is no account and nothing is uploaded. No analytics, and the microphone is never touched.
+
+## How it works
+
+MediaPipe finds 21 points on each hand. Each capture becomes a feature vector (joint angles and distances, scale- and rotation-normalised), and a nearest-neighbour matcher compares live hands against what you taught, plus the eight neutral poses so it knows what is *not* a sign. A second model cuts you out of the frame so the domain can sit behind you; if it can't load, the effects draw over the camera instead.
+
 ```
-
-`boxes.json` maps each photo to its hands, `{"rock_01.jpg": {"w": 512, "h": 384, "hands": [{"box": [x0, y0, x1, y1], "handed": "Left"}]}}`, where `handed` is MediaPipe's label for the unflipped photo; the class is the file-name prefix (`call`, `four`, `none`, `rock`). No photos ship with the repository. Other options: `--base http://localhost:4173` to test the production build, `--only landing,real` to run some sections, and `--seg-model model.tflite --seg-photo person.jpg` for the person-cutout check. Results of the runs so far are in [docs/test-log.md](docs/test-log.md).
-
-Two URL switches help on slow machines and in tests: `?handFps=6` lowers the hand-tracking rate (5–20, default 18) so segmentation gets time, and `?delegate=cpu` skips the GPU attempt.
-
-## Layout
-
-```
-src/core/       features, matcher, gate, capture, challenge, storage
-src/handmodel/  procedural hand used by tests, the stand-in and the card drawings
-src/domains/    catalog, shared engine, one module per domain
-src/render/     stage compositor, geometry, stand-in figure
+src/core/       features, matcher, gate, capture, storage
+src/domains/    one module per domain animation
+src/render/     stage, geometry, stand-in figure
 src/media/      camera, tracker, segmentation, audio, recorder
 src/ui/         panels, cards, header
-tests/          unit tests, fixtures and the browser test runner
-scripts/        WASM copy, model download, pose-card generation
+src/handmodel/  procedural hand used by tests and the card drawings
+tests/          unit tests and the browser test runner
 ```
 
-## Credits and licences
+`npm run fetch-models` downloads the MediaPipe models into `public/models/` so the app needs no network at all.
+
+## Particles
+
+Every cast also runs a live particle field on top: a few hundred motes rendered with WebGL through three.js and an UnrealBloom pass, so overlapping motes burn out to white. Each domain has its own field: the void bursts outward from your hands, the shrine comes up in embers, and the garden just swirls. It follows the cast clock and the midpoint between your hands, and the stage skips it entirely if WebGL is unavailable. three.js is loaded only once a cast needs it, so it stays out of the first page load.
+
+## Domain backgrounds
+
+Each domain draws itself in code, and each also has a pre-rendered backdrop in `public/domains/`. When one loads, it replaces the painted sky; the hands, charge, person cutout, slashes and titles still draw live on top. If a file is missing the domain falls back to drawing its own world, so the app works either way.
+
+The backdrops are built with [Remotion](https://remotion.dev) in `remotion/`, where blur stacks and hundreds of layers cost nothing because it renders offline:
+
+```bash
+cd remotion
+npm install
+npx remotion studio                 # live preview
+node render-all.mjs                 # renders into ../public/domains/
+```
+
+Rendering needs a Chrome: `CHROME_PATH=/path/to/chrome node render-all.mjs`.
+
+## Rough edges
+
+Unit tests and the browser runner cover the pipeline, but they drive it with
+photos and synthetic hands, not a face in front of a webcam. Things I know are
+still open:
+
+- Chromium is the only browser it has actually run in. Firefox and Safari
+  should work, but recording is the risky part: the container falls out of
+  `MediaRecorder.isTypeSupported`, so Firefox will hand you a WebM instead of
+  the MP4 Chromium gives you.
+- The GPU delegate is untested. MediaPipe is asked for GPU first and falls back
+  to CPU, and CPU is the path that has had the miles.
+- On a slow machine hand tracking eats the whole frame budget and the person
+  cutout starves. The app notices after 4 s and switches to overlay mode, but
+  the threshold is a guess. `?handFps=6` helps.
+- Interlaced fingers (Megumi) and pressed palms (Sukuna) are genuinely hard for
+  the tracker, which is why each card offers a camera-friendly variant.
+
+## Credits
 
 - Code: MIT, see [LICENSE](LICENSE).
-- Visual inspiration: the reel by @reinesana.ai. None of its media, music or footage is used.
-- Jujutsu Kaisen © Gege Akutami / Shueisha, JUJUTSU KAISEN Production Committee. Official references link to [jujutsukaisen.jp](https://jujutsukaisen.jp/). No anime frames, music, dialogue or voices are used.
-- Hand tracking and segmentation: [Google MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/guide) Tasks Vision and its models, Apache-2.0. See [NOTICE](NOTICE).
-- Fonts: IBM Plex Sans and Mono, Instrument Serif, Caveat and Anton via Fontsource, SIL Open Font License 1.1.
+- Jujutsu Kaisen © Gege Akutami / Shueisha, JUJUTSU KAISEN Production Committee. No anime frames, music or audio are used here.
+- Hand tracking: [Google MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/guide), Apache-2.0, see [NOTICE](NOTICE).
+- Particles and bloom: [three.js](https://threejs.org) and its post-processing passes, MIT.
+- Backgrounds rendered with [Remotion](https://remotion.dev) (free for individuals and small teams; see their licence for company use).
+- Fonts: IBM Plex, Instrument Serif, Schibsted Grotesk, Caveat, Anton via Fontsource, OFL 1.1.
+- Visual inspiration: the reel by @reinesana.ai. None of its media is used.
