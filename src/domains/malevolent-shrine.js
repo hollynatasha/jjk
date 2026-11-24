@@ -640,7 +640,7 @@ export default {
     }
     g.font = `500 13px ${FONTS.mono}`;
     g.fillStyle = rgba(C.oxDeep, 0.85);
-    drawTracked(g, 'permit hrd-02 · filed in ink · @hollynst', 0, phh / 2 - 18, 1.2, 'center');
+    drawTracked(g, 'expansion hrd-02 · filed in ink · @hollynst', 0, phh / 2 - 18, 1.2, 'center');
     g.restore();
   },
 };

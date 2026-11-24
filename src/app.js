@@ -121,7 +121,7 @@ export class App {
     // screenshot tests are deterministic. inert otherwise.
     this.debug = new URLSearchParams(location.search).get('debug') === '1';
     this.clockOverride = null;
-    window.__domainPermit = this; // read-only debugging handle for the e2e harness
+    window.__domainExpansion = this; // read-only debugging handle for the e2e harness
   }
 
   // ---------- derived settings ----------

@@ -1,5 +1,5 @@
 {
-  "name": "domain-permit-remotion",
+  "name": "domain-expansion-remotion",
   "private": true,
   "version": "1.0.0",
   "description": "Pre-rendered domain backgrounds. Renders to ../public/domains/*.mp4.",

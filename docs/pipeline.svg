@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 790" width="1240" height="790" font-family="IBM Plex Mono, ui-monospace, Menlo, Consolas, monospace">
-  <title>Domain Permit pipeline</title>
-  <desc>Domain Permit pipeline: camera, hand tracking, features, matcher, hold gate, stage.</desc>
+  <title>Domain Expansion pipeline</title>
+  <desc>Domain Expansion pipeline: camera, hand tracking, features, matcher, hold gate, stage.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#c6ff3a"/>
@@ -20,7 +20,7 @@
   </defs>
 
   <rect width="1240" height="790" fill="#000"/>
-  <text x="40" y="52" class="h" font-size="22">DOMAIN PERMIT · PIPELINE</text>
+  <text x="40" y="52" class="h" font-size="22">DOMAIN EXPANSION · PIPELINE</text>
   <text x="40" y="76" class="t">Everything below runs inside one browser tab. Camera frames are never stored or sent anywhere.</text>
 
   <!-- Row 1: recognition -->

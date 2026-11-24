@@ -558,7 +558,7 @@ export default {
     g.shadowBlur = 0;
     g.font = `500 15px ${FONTS.mono}`;
     g.fillStyle = rgba(C.ice, 0.75 * out * clamp01((t - t0 - 0.8) / 0.6));
-    drawTracked(g, 'permit hrd-01 · granted by the department · @hollynst', W / 2, H * 0.865 + 34, 1.5, 'center');
+    drawTracked(g, 'expansion hrd-01 · granted by the department · @hollynst', W / 2, H * 0.865 + 34, 1.5, 'center');
     g.restore();
   },
 };

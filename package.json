@@ -1,8 +1,8 @@
 {
-  "name": "holly-rd-domain-permit",
+  "name": "holly-rd-domain-expansion",
   "version": "1.0.0",
   "private": true,
-  "description": "Domain Permit: Holly's R&D Department, by @hollynst. A webcam hand-sign ritual built on MediaPipe hand landmarks and a locally trained pose matcher.",
+  "description": "Domain Expansion: Holly's R&D Department, by @hollynst. A webcam hand-sign ritual built on MediaPipe hand landmarks and a locally trained pose matcher.",
   "type": "module",
   "license": "MIT",
   "engines": {

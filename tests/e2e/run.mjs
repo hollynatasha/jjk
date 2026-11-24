@@ -74,7 +74,7 @@ async function openPage(browser, { path = '/', viewport = { width: 1440, height:
   const client = await page.createCDPSession();
   await client.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: join(OUT, 'downloads') }).catch(() => {});
   await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 90000 });
-  await page.waitForFunction(() => window.__domainPermit && window.__domainPermit.raf, { timeout: 30000 });
+  await page.waitForFunction(() => window.__domainExpansion && window.__domainExpansion.raf, { timeout: 30000 });
   return { page, errors, blocked, requests };
 }
 
@@ -206,7 +206,7 @@ async function fileOpen(browser) {
       await sleep(6000);
       const r = await page.evaluate(() => {
         const late = document.querySelector('.boot-late');
-        return { started: !!window.__domainPermit, text: late ? late.textContent.trim() : '', visible: late ? getComputedStyle(late).opacity === '1' : false };
+        return { started: !!window.__domainExpansion, text: late ? late.textContent.trim() : '', visible: late ? getComputedStyle(late).opacity === '1' : false };
       });
       record('file-open:explains', !r.started && r.visible && /npm run dev/.test(r.text), { r, note: r.started ? 'app started from file:// (unexpected)' : `app did not start; message shown: ${r.visible}` });
     } finally {
@@ -228,7 +228,7 @@ async function cameraErrors(browser) {
       const { page } = await openPage(browser, { before: c.before });
       if (c.err) await page.evaluate((e) => (window.__feed.error = e), c.err);
       await page.click('#start-camera');
-      await page.waitForFunction(() => window.__domainPermit.mode === 'error', { timeout: 20000 });
+      await page.waitForFunction(() => window.__domainExpansion.mode === 'error', { timeout: 20000 });
       const text = await page.$eval('#panel', (p) => p.innerText);
       const hasRetry = !!(await page.$('#retry-camera'));
       await page.screenshot({ path: join(OUT, `error-${c.name}.png`) });
@@ -239,7 +239,7 @@ async function cameraErrors(browser) {
   await step('camera-error:model-load-failure', async () => {
     const { page } = await openPage(browser, { path: '/?noLocalModels=1&offline=1' });
     await page.click('#start-camera');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'error', { timeout: 30000 });
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'error', { timeout: 30000 });
     const text = await page.$eval('#panel', (p) => p.innerText);
     record('camera-error:model-load-failure', /did not load/i.test(text), { note: text.split('\n')[0] });
     await page.close();
@@ -250,25 +250,25 @@ async function simulation(browser, { reducedMotion = false, tag = 'sim' } = {}) 
   await step(`${tag}:all-domains`, async () => {
     const { page, errors } = await openPage(browser, { path: '/?debug=1', reducedMotion, feed: false });
     await page.click('#open-sim');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'sim');
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'sim');
     const banner = await page.$eval('.sim-banner', (b) => b.textContent).catch(() => '');
     const seen = {};
     for (const [i, id] of ['gojo', 'sukuna', 'megumi'].entries()) {
       // keyboard shortcut for half the domains, buttons for the rest
       if (i % 2) await page.keyboard.press(String(i + 1));
       else await page.click(`#sim-${id}`);
-      await page.waitForFunction(() => window.__domainPermit.run && window.__domainPermit.run.startedAt !== null, { timeout: 10000 });
-      const info = await app(page, () => ({ id: window.__domainPermit.run.module.id, sim: !!window.__domainPermit.run.record.simulated, reduced: !!window.__domainPermit.run.record.reduced, total: window.__domainPermit.run.total, locked: [...document.querySelectorAll('#panel button')].every((b) => b.disabled || b.textContent.includes('Sound')) }));
+      await page.waitForFunction(() => window.__domainExpansion.run && window.__domainExpansion.run.startedAt !== null, { timeout: 10000 });
+      const info = await app(page, () => ({ id: window.__domainExpansion.run.module.id, sim: !!window.__domainExpansion.run.record.simulated, reduced: !!window.__domainExpansion.run.record.reduced, total: window.__domainExpansion.run.total, locked: [...document.querySelectorAll('#panel button')].every((b) => b.disabled || b.textContent.includes('Sound')) }));
       seen[id] = info;
       for (const t of [0.2, 1.0, 3.0, 6.6]) {
-        await app(page, (tt) => window.__domainPermit.freezeCastAt(tt), t);
+        await app(page, (tt) => window.__domainExpansion.freezeCastAt(tt), t);
         await raf2(page);
         await canvasPng(page, join(OUT, `${tag}-${id}-${t}.png`));
       }
-      await app(page, () => window.__domainPermit.freezeCastAt(7.95));
+      await app(page, () => window.__domainExpansion.freezeCastAt(7.95));
       await raf2(page);
-      await app(page, () => window.__domainPermit.releaseClock());
-      await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
+      await app(page, () => window.__domainExpansion.releaseClock());
+      await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 15000 });
     }
     const ids = Object.values(seen).map((s) => s.id);
     const ok = new Set(ids).size === 3 && Object.values(seen).every((s) => s.sim && s.reduced === reducedMotion && s.locked) && /SIMULATION/.test(banner) && errors.length === 0;
@@ -284,10 +284,10 @@ async function toggles(browser) {
       await page.keyboard.press('m');
       await page.click('#btn-effects');
       await page.click('#btn-motion');
-      const s1 = await app(page, () => ({ ...window.__domainPermit.settings, audioMuted: window.__domainPermit.audio.muted }));
+      const s1 = await app(page, () => ({ ...window.__domainExpansion.settings, audioMuted: window.__domainExpansion.audio.muted }));
       await page.reload({ waitUntil: 'load', timeout: 90000 });
-      await page.waitForFunction(() => window.__domainPermit && window.__domainPermit.raf, { timeout: 30000 });
-      const s2 = await app(page, () => ({ ...window.__domainPermit.settings, label: document.getElementById('btn-mute').textContent }));
+      await page.waitForFunction(() => window.__domainExpansion && window.__domainExpansion.raf, { timeout: 30000 });
+      const s2 = await app(page, () => ({ ...window.__domainExpansion.settings, label: document.getElementById('btn-mute').textContent }));
       const ok = s1.muted && s1.audioMuted && s1.effects === 'low' && s1.motion === 'reduced' && s2.muted && s2.effects === 'low' && s2.motion === 'reduced' && /Sound off/.test(s2.label);
       record('settings:mute-effects-motion-persist', ok, { note: `after reload: muted=${s2.muted} effects=${s2.effects} motion=${s2.motion}` });
     } finally {
@@ -308,7 +308,7 @@ async function toggles(browser) {
     }
     await page.focus('#open-sim');
     await page.keyboard.press('Enter');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'sim', { timeout: 5000 });
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'sim', { timeout: 5000 });
     const ok = order.some((o) => /Start camera/.test(o.label)) && order.filter((o) => o.label).every((o) => o.outline);
     record('keyboard:tab-and-activate', ok, { order, note: order.map((o) => o.label).join(' | ') });
     await page.close();
@@ -322,12 +322,12 @@ async function recordingSim(browser) {
     const clips = [];
     for (const id of ['megumi', 'gojo']) {
       await page.click(`#sim-${id}`);
-      await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 20000 });
+      await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 20000 });
       const since = Date.now();
       await page.click('#btn-record');
-      await page.waitForFunction(() => window.__domainPermit.rec.phase === 'recording', { timeout: 10000 });
-      await page.waitForFunction(() => window.__domainPermit.clip, { timeout: 30000 });
-      const c = await app(page, () => ({ mime: window.__domainPermit.clip.mime, ext: window.__domainPermit.clip.ext, ms: window.__domainPermit.clip.durationMs, audio: window.__domainPermit.clip.hasAudio, domain: window.__domainPermit.clip.domain }));
+      await page.waitForFunction(() => window.__domainExpansion.rec.phase === 'recording', { timeout: 10000 });
+      await page.waitForFunction(() => window.__domainExpansion.clip, { timeout: 30000 });
+      const c = await app(page, () => ({ mime: window.__domainExpansion.clip.mime, ext: window.__domainExpansion.clip.ext, ms: window.__domainExpansion.clip.durationMs, audio: window.__domainExpansion.clip.hasAudio, domain: window.__domainExpansion.clip.domain }));
       await page.click('#btn-clip');
       const file = await waitDownload('domain-expansion-', c.ext, since);
       const p = probe(file);
@@ -358,7 +358,7 @@ async function dataDialog(browser) {
   await step('data-dialog:import-export-delete', async () => {
     const { page, errors } = await openPage(browser, { feed: false });
     try {
-      const counts = () => app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length, status: document.getElementById('data-status') ? document.getElementById('data-status').textContent : '' }));
+      const counts = () => app(page, () => ({ caps: window.__domainExpansion.captures.length, live: window.__domainExpansion.trainedDomains().length, status: document.getElementById('data-status') ? document.getElementById('data-status').textContent : '' }));
       const importFile = async (file) => {
         await page.evaluate(() => (document.getElementById('data-status').textContent = ''));
         await (await page.$('#import-file')).uploadFile(file);
@@ -380,7 +380,7 @@ async function dataDialog(browser) {
       const data = JSON.parse(raw);
       await clickText(page, 'Delete all training data', '#data-dialog button');
       await clickText(page, 'Press again to delete everything', '#data-dialog button');
-      await page.waitForFunction(() => window.__domainPermit.captures.length === 0, { timeout: 5000 });
+      await page.waitForFunction(() => window.__domainExpansion.captures.length === 0, { timeout: 5000 });
       const deleted = await counts();
       const stored = await page.evaluate(() => new Promise((res) => {
         const rq = indexedDB.open('holly-rd-domain-permit');
@@ -472,13 +472,13 @@ async function screenPhotos(page, feed) {
         const want = slot === 'r' ? 'Right' : 'Left';
         const flip = !!it.handed && it.handed !== want;
         await page.evaluate(() => window.__feed.clear());
-        await page.waitForFunction(() => !window.__domainPermit.hand.feat || window.__domainPermit.hand.feat.count === 0, { timeout: 2000, polling: 50 }).catch(() => {});
+        await page.waitForFunction(() => !window.__domainExpansion.hand.feat || window.__domainExpansion.hand.feat.count === 0, { timeout: 2000, polling: 50 }).catch(() => {});
         const scale = Math.min(1.6, Math.max(0.8, 100 / it.handSize));
         await page.evaluate((item) => window.__feed.set([item]), { img: it.file, crop: it.crop, hard: true, cx: SLOT_X[slot], cy: 262, scale, rot: 0, sx: 1, flip });
         const seen = await page
           .waitForFunction(
             (w) => {
-              const a = window.__domainPermit;
+              const a = window.__domainExpansion;
               const f = a.hand.feat;
               return !!(f && f.count === 1 && f.info.minScore > 0.85 && a.hand.frame.hands[0].handedness === w);
             },
@@ -528,11 +528,11 @@ const swaps = { capture: 0, trial: 0, live: 0 };
 
 /** Shows make(attempt) until the app stores a capture; a different photo set per attempt. */
 async function captureWith(page, make, { tries = 6, timeout = 9000 } = {}) {
-  const before = await app(page, () => window.__domainPermit.captures.length);
+  const before = await app(page, () => window.__domainExpansion.captures.length);
   for (let a = 0; a < tries; a++) {
     if (a) swaps.capture++;
     await page.evaluate((it) => window.__feed.set(it), make(a));
-    const ok = await page.waitForFunction((b) => window.__domainPermit.captures.length > b, { timeout, polling: 100 }, before).then(() => true, () => false);
+    const ok = await page.waitForFunction((b) => window.__domainExpansion.captures.length > b, { timeout, polling: 100 }, before).then(() => true, () => false);
     await page.evaluate(() => window.__feed.clear());
     await sleep(ok ? 700 : 500);
     if (ok) return a;
@@ -540,7 +540,7 @@ async function captureWith(page, make, { tries = 6, timeout = 9000 } = {}) {
   throw new Error(`no capture after ${tries} photo sets`);
 }
 
-const seesHands = (page, n) => app(page, (k) => !!(window.__domainPermit.hand.feat && window.__domainPermit.hand.feat.count === k), n);
+const seesHands = (page, n) => app(page, (k) => !!(window.__domainExpansion.hand.feat && window.__domainExpansion.hand.feat.count === k), n);
 
 /**
  * Holds a stand-in sign in front of the live gate until it casts. Photos are
@@ -556,7 +556,7 @@ async function showUntilCast(page, feed, d, pick, timeout = 15000) {
   await page.evaluate((it) => window.__feed.set(it), composeSign(feed, STANDIN[d].hands, p, VIEW_T[0]));
   while (Date.now() - t0 < timeout) {
     const st = await app(page, () => {
-      const a = window.__domainPermit;
+      const a = window.__domainExpansion;
       const c = a.hand.cls;
       return { run: !!a.run, gate: a.gate.state, best: c && c.best, accepted: !!(c && c.accepted), reason: c && c.reason, dist: c && c.dist && +c.dist.toFixed(3), thr: c && c.threshold && +c.threshold.toFixed(3) };
     });
@@ -596,11 +596,11 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
   try {
     await loadFeedImages(page, feed);
     await page.click('#start-camera');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'library', { timeout: 120000 });
-    const models = await app(page, () => ({ ...window.__domainPermit.models, delegate: window.__domainPermit.tracker.delegate, handSource: window.__domainPermit.tracker.handSource }));
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'library', { timeout: 120000 });
+    const models = await app(page, () => ({ ...window.__domainExpansion.models, delegate: window.__domainExpansion.tracker.delegate, handSource: window.__domainExpansion.tracker.handSource }));
     note(`camera on; hand model ${models.handSource && models.handSource.label} (${models.handSource && models.handSource.bytes} bytes) on ${models.delegate}`);
-    await page.waitForFunction(() => ['ready', 'failed', 'slow'].includes(window.__domainPermit.models.seg), { timeout: 60000 });
-    const seg = await app(page, () => ({ seg: window.__domainPermit.models.seg, note: window.__domainPermit.models.segNote, src: window.__domainPermit.models.segSrc }));
+    await page.waitForFunction(() => ['ready', 'failed', 'slow'].includes(window.__domainExpansion.models.seg), { timeout: 60000 });
+    const seg = await app(page, () => ({ seg: window.__domainExpansion.models.seg, note: window.__domainExpansion.models.segNote, src: window.__domainExpansion.models.segSrc }));
     note(`segmentation: ${seg.seg} ${seg.src || ''} ${seg.note || ''}`);
     record(`${tag}:models-load-from-running-app`, models.hand === 'ready', { models, seg, blocked: blocked.slice(0, 4), note: `hand=${models.hand} via ${models.handSource && models.handSource.label}; seg=${seg.seg}` });
 
@@ -610,11 +610,11 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
 
     // both hands in frame
     await page.evaluate((it) => window.__feed.set(it), composeSign(feed, STANDIN.sukuna.hands, 0));
-    await page.waitForFunction(() => window.__domainPermit.hand.feat && window.__domainPermit.hand.feat.count === 2, { timeout: 20000 });
+    await page.waitForFunction(() => window.__domainExpansion.hand.feat && window.__domainExpansion.hand.feat.count === 2, { timeout: 20000 });
     await sleep(800);
     await canvasPng(page, join(OUT, `${tag}-tracking-two-hands.png`));
     const align = await app(page, () => {
-      const a = window.__domainPermit;
+      const a = window.__domainExpansion;
       const f = a.hand.frame;
       const v = a.view;
       // Mirror check: each wrist drawn on the stage must sit at the mirrored raw
@@ -641,55 +641,55 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     const reports = {};
     for (const [di, d] of order.entries()) {
       await page.click(`#teach-${d}`);
-      await page.waitForFunction(() => ['negatives', 'teach'].includes(window.__domainPermit.mode), { timeout: 10000 });
-      let mode = await app(page, () => window.__domainPermit.mode);
+      await page.waitForFunction(() => ['negatives', 'teach'].includes(window.__domainExpansion.mode), { timeout: 10000 });
+      let mode = await app(page, () => window.__domainExpansion.mode);
       if (mode === 'negatives') {
         let k = 0;
-        while ((await app(page, () => window.__domainPermit.mode)) === 'negatives') {
-          const idx = await app(page, () => window.__domainPermit.teach.index);
+        while ((await app(page, () => window.__domainExpansion.mode)) === 'negatives') {
+          const idx = await app(page, () => window.__domainExpansion.teach.index);
           const prompt = ['open-palm', 'fist', 'peace', 'wave', 'relaxed', 'palms', 'clap', 'fists'][idx];
           await captureWith(page, (a) => composeSign(feed, NEG[prompt], 7 + k * 2 + a * 5, VIEW_T[k % 12]));
           k++;
         }
         note(`neutral poses captured: ${k}`);
-        mode = await app(page, () => window.__domainPermit.mode);
+        mode = await app(page, () => window.__domainExpansion.mode);
       }
       for (let slot = 0; slot < 12; slot++) {
-        const s = await app(page, () => window.__domainPermit.teach && window.__domainPermit.teach.slot);
+        const s = await app(page, () => window.__domainExpansion.teach && window.__domainExpansion.teach.slot);
         if (s === -1 || s === null) break;
         await captureWith(page, (a) => composeSign(feed, STANDIN[d].hands, s + a * 5, VIEW_T[s]));
         if (slot === 3 && d === 'gojo') await canvasPng(page, join(OUT, `${tag}-teach-gojo.png`));
       }
-      await page.waitForFunction(() => window.__domainPermit.teach && window.__domainPermit.teach.phase === 'review', { timeout: 15000 });
+      await page.waitForFunction(() => window.__domainExpansion.teach && window.__domainExpansion.teach.phase === 'review', { timeout: 15000 });
       const rep = await app(page, (dd) => {
-        const r = window.__domainPermit.matcher.reports[dd];
+        const r = window.__domainExpansion.matcher.reports[dd];
         return r ? { status: r.status, message: r.message, threshold: r.threshold, confusions: r.confusions, misses: r.misses.length, flagged: r.flagged.length } : null;
       }, d);
       reports[d] = rep;
       note(`${d}: ${rep && rep.status} · ${rep && rep.message}`);
       if (di === 0) await page.screenshot({ path: join(OUT, `${tag}-teach-review.png`) });
     }
-    const allReports = await app(page, () => Object.fromEntries(Object.entries(window.__domainPermit.matcher.reports).map(([k, r]) => [k, { status: r.status, message: r.message, threshold: r.threshold && +r.threshold.toFixed(4), confusions: r.confusions }])));
+    const allReports = await app(page, () => Object.fromEntries(Object.entries(window.__domainExpansion.matcher.reports).map(([k, r]) => [k, { status: r.status, message: r.message, threshold: r.threshold && +r.threshold.toFixed(4), confusions: r.confusions }])));
     record(`${tag}:teach-four-signs`, Object.keys(allReports).length === 4, { reports: allReports, note: Object.entries(allReports).map(([k, r]) => `${k}=${r.status}`).join(', ') });
 
     // Retake one slot (UI path), then confirm the sign is still validated.
-    await page.waitForFunction(() => window.__domainPermit.teach.phase === 'review', { timeout: 15000 });
-    record(`${tag}:retake-slot`, true, { note: `megumi after retake: ${await app(page, () => window.__domainPermit.matcher.reports.megumi.status)}` });
+    await page.waitForFunction(() => window.__domainExpansion.teach.phase === 'review', { timeout: 15000 });
+    record(`${tag}:retake-slot`, true, { note: `megumi after retake: ${await app(page, () => window.__domainExpansion.matcher.reports.megumi.status)}` });
 
     // Test my signs: show the prompted sign (held-out photos) during trials, nothing during rest.
-    const trained = await app(page, () => window.__domainPermit.trainedDomains());
+    const trained = await app(page, () => window.__domainExpansion.trainedDomains());
     note(`trained (live) signs: ${trained.join(', ')}`);
-    await app(page, () => window.__domainPermit.goLibrary());
-    await page.waitForFunction(() => window.__domainPermit.mode === 'library');
+    await app(page, () => window.__domainExpansion.goLibrary());
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'library');
     await page.click('#start-test');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'test');
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'test');
     let lastKey = '';
     let trial = null;
     const trialDiag = [];
     const t0 = Date.now();
     while (Date.now() - t0 < 400000) {
       const s = await app(page, () => {
-        const a = window.__domainPermit;
+        const a = window.__domainExpansion;
         if (a.challengeResults) return { done: true };
         const c = a.hand.cls;
         return { ...a.challengeSnap, seen: c ? { count: c.count, best: c.best, reason: c.reason, dist: Number.isFinite(c.dist) ? +c.dist.toFixed(3) : null, thr: c.threshold && +c.threshold.toFixed(3) } : null };
@@ -735,7 +735,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     }
     await page.evaluate(() => window.__feed.clear());
     const challenge = await app(page, () => {
-      const r = window.__domainPermit.challengeResults;
+      const r = window.__domainExpansion.challengeResults;
       return r ? { perSign: r.perSign, ready: r.ready, falsePositives: r.falsePositives, records: r.records } : null;
     });
     await page.screenshot({ path: join(OUT, `${tag}-test-results.png`) });
@@ -746,12 +746,12 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     record(`${tag}:test-my-signs`, !!challenge, { challenge, trials: trialDiag, note: challenge ? Object.entries(challenge.perSign).map(([k, v]) => `${k} ${v.success}/${v.attempts} miss ${v.misses} conf ${JSON.stringify(v.confusions)} fp ${v.falsePositives}`).join(' | ') : 'no results' });
 
     // Live: cast each trained sign without tapping a domain button.
-    await app(page, () => window.__domainPermit.goLive());
-    await page.waitForFunction(() => window.__domainPermit.mode === 'live');
+    await app(page, () => window.__domainExpansion.goLive());
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'live');
     const casts = {};
     for (const d of trained) {
       await page.evaluate(() => window.__feed.clear());
-      await page.waitForFunction(() => ['armed'].includes(window.__domainPermit.gate.state) && !window.__domainPermit.run, { timeout: 20000 });
+      await page.waitForFunction(() => ['armed'].includes(window.__domainExpansion.gate.state) && !window.__domainExpansion.run, { timeout: 20000 });
       const tStart = Date.now();
       const ok = await showUntilCast(page, feed, d, 1);
       if (!ok) {
@@ -759,18 +759,18 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
         note(`live ${d}: no cast within 15 s · ${JSON.stringify(showUntilCast.last)}`);
         continue;
       }
-      const info = await app(page, () => ({ domain: window.__domainPermit.run.record.domainId, anim: window.__domainPermit.run.module.id, seed: window.__domainPermit.run.record.seed }));
+      const info = await app(page, () => ({ domain: window.__domainExpansion.run.record.domainId, anim: window.__domainExpansion.run.module.id, seed: window.__domainExpansion.run.record.seed }));
       casts[d] = { cast: true, ...info, latencyMs: Date.now() - tStart };
       // hands vanish mid-cast: the sequence must finish on its own, same domain
       await page.evaluate(() => window.__feed.clear());
       for (const t of [0.15, 1.0, 3.0]) {
-        await app(page, (tt) => window.__domainPermit.freezeCastAt(tt), t);
+        await app(page, (tt) => window.__domainExpansion.freezeCastAt(tt), t);
         await raf2(page);
         await canvasPng(page, join(OUT, `${tag}-live-${d}-${t}.png`));
       }
-      await app(page, () => window.__domainPermit.releaseClock());
-      await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
-      casts[d].finishedDomain = await app(page, () => window.__domainPermit.lastRecord.domainId);
+      await app(page, () => window.__domainExpansion.releaseClock());
+      await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 15000 });
+      casts[d].finishedDomain = await app(page, () => window.__domainExpansion.lastRecord.domainId);
       note(`live ${d}: cast ${casts[d].anim} after ${casts[d].latencyMs} ms`);
     }
     const anims = Object.values(casts).filter((c) => c.cast).map((c) => c.anim);
@@ -779,40 +779,40 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     // Release-to-rearm: a sign held through its own cast and the cooldown must not recast.
     const d0 = trained[0];
     await page.evaluate(() => window.__feed.clear());
-    await page.waitForFunction(() => window.__domainPermit.gate.state === 'armed' && !window.__domainPermit.run, { timeout: 20000 });
+    await page.waitForFunction(() => window.__domainExpansion.gate.state === 'armed' && !window.__domainExpansion.run, { timeout: 20000 });
     if (!(await showUntilCast(page, feed, d0, 1))) throw new Error(`${d0} did not cast for the hold test`);
-    await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
-    const held = await page.waitForFunction(() => window.__domainPermit.run, { timeout: 5000 }).then(() => true, () => false);
-    const gateHeld = await app(page, () => window.__domainPermit.gate.state);
+    await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 15000 });
+    const held = await page.waitForFunction(() => window.__domainExpansion.run, { timeout: 5000 }).then(() => true, () => false);
+    const gateHeld = await app(page, () => window.__domainExpansion.gate.state);
     // dropping the hands re-arms it, and the sign casts again
     await page.evaluate(() => window.__feed.clear());
-    await page.waitForFunction(() => window.__domainPermit.gate.state === 'armed', { timeout: 10000 });
+    await page.waitForFunction(() => window.__domainExpansion.gate.state === 'armed', { timeout: 10000 });
     const recast = await showUntilCast(page, feed, d0, 1);
-    if (recast) await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
+    if (recast) await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 15000 });
     await page.evaluate(() => window.__feed.clear());
     record(`${tag}:hold-does-not-recast`, !held && gateHeld === 'release' && recast, { note: `${held ? 'recast while held (bad)' : `no recast while held (gate: ${gateHeld})`}; after dropping the hands: ${recast ? 'cast again' : 'did not cast'}` });
 
     // Replay uses the stored record (same seed), not a new sign.
-    await page.waitForFunction(() => window.__domainPermit.mode === 'result');
-    const seedBefore = await app(page, () => window.__domainPermit.lastRecord.seed);
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'result');
+    const seedBefore = await app(page, () => window.__domainExpansion.lastRecord.seed);
     await page.click('#btn-replay');
-    await page.waitForFunction(() => window.__domainPermit.run, { timeout: 5000 });
-    const rep = await app(page, () => ({ seed: window.__domainPermit.run.record.seed, replay: !!window.__domainPermit.run.record.replayOf }));
-    await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
+    await page.waitForFunction(() => window.__domainExpansion.run, { timeout: 5000 });
+    const rep = await app(page, () => ({ seed: window.__domainExpansion.run.record.seed, replay: !!window.__domainExpansion.run.record.replayOf }));
+    await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 15000 });
     record(`${tag}:replay-same-seed`, rep.replay && rep.seed === seedBefore, { note: `seed ${seedBefore} -> ${rep.seed}` });
 
     // Record a real cast: countdown, sign, cast, +1 s.
     await page.evaluate(() => window.__feed.clear());
-    await app(page, () => window.__domainPermit.goLive());
-    await page.waitForFunction(() => window.__domainPermit.mode === 'live');
+    await app(page, () => window.__domainExpansion.goLive());
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'live');
     const since = Date.now();
     await page.click('#btn-record');
     const dRec = trained.includes('megumi') ? 'megumi' : trained[0];
-    await page.waitForFunction(() => window.__domainPermit.rec.phase === 'recording', { timeout: 10000 });
+    await page.waitForFunction(() => window.__domainExpansion.rec.phase === 'recording', { timeout: 10000 });
     if (!(await showUntilCast(page, feed, dRec, 2))) throw new Error(`${dRec} did not cast while recording`);
-    await page.waitForFunction(() => window.__domainPermit.clip, { timeout: 40000 });
+    await page.waitForFunction(() => window.__domainExpansion.clip, { timeout: 40000 });
     await page.evaluate(() => window.__feed.clear());
-    const clip = await app(page, () => ({ mime: window.__domainPermit.clip.mime, ext: window.__domainPermit.clip.ext, ms: window.__domainPermit.clip.durationMs, audio: window.__domainPermit.clip.hasAudio, domain: window.__domainPermit.clip.domain }));
+    const clip = await app(page, () => ({ mime: window.__domainExpansion.clip.mime, ext: window.__domainExpansion.clip.ext, ms: window.__domainExpansion.clip.durationMs, audio: window.__domainExpansion.clip.hasAudio, domain: window.__domainExpansion.clip.domain }));
     await page.click('#btn-clip');
     const file = await waitDownload('domain-expansion-', clip.ext, since);
     const p = probe(file);
@@ -825,8 +825,8 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
 
     // Training data dialog: export, delete everything, import the export back.
     await page.evaluate(() => window.__feed.clear());
-    if (await app(page, () => window.__domainPermit.mode === 'result')) await app(page, () => window.__domainPermit.goLibrary());
-    const before = await app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length }));
+    if (await app(page, () => window.__domainExpansion.mode === 'result')) await app(page, () => window.__domainExpansion.goLibrary());
+    const before = await app(page, () => ({ caps: window.__domainExpansion.captures.length, live: window.__domainExpansion.trainedDomains().length }));
     const sinceExport = Date.now();
     await page.click('#btn-data');
     await page.waitForFunction(() => document.getElementById('data-dialog').open, { timeout: 5000 });
@@ -842,18 +842,18 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     // Delete through the dialog (two presses): nothing fires afterwards.
     await clickText(page, 'Delete all training data', '#data-dialog button');
     await clickText(page, 'Press again to delete everything', '#data-dialog button');
-    await page.waitForFunction(() => window.__domainPermit.captures.length === 0, { timeout: 5000 });
-    const after = await app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length }));
+    await page.waitForFunction(() => window.__domainExpansion.captures.length === 0, { timeout: 5000 });
+    const after = await app(page, () => ({ caps: window.__domainExpansion.captures.length, live: window.__domainExpansion.trainedDomains().length }));
     record(`${tag}:delete-training`, after.caps === 0 && after.live === 0, { note: `before ${before.caps} captures / ${before.live} live signs; after ${after.caps} / ${after.live}` });
 
     // Import the export back through the file picker.
     const input = await page.$('#import-file');
     await input.uploadFile(exported);
     await page.waitForFunction(() => /^Imported/.test(document.getElementById('data-status').textContent), { timeout: 10000 });
-    const restored = await app(page, () => ({ caps: window.__domainPermit.captures.length, live: window.__domainPermit.trainedDomains().length, status: document.getElementById('data-status').textContent }));
+    const restored = await app(page, () => ({ caps: window.__domainExpansion.captures.length, live: window.__domainExpansion.trainedDomains().length, status: document.getElementById('data-status').textContent }));
     record(`${tag}:import-training`, restored.caps === before.caps && restored.live === before.live, { note: `${restored.status} live signs ${restored.live}` });
     await clickText(page, 'Close', '#data-dialog button');
-    await app(page, () => window.__domainPermit.deleteAllTraining());
+    await app(page, () => window.__domainExpansion.deleteAllTraining());
     note(`photo swaps after detector misses: ${JSON.stringify(swaps)}`);
     record(`${tag}:detector-swaps`, true, { swaps, note: `teach captures ${swaps.capture}, challenge trials ${swaps.trial}, live ${swaps.live} (harness showed another photo after the palm detector missed a hand)` });
     const bad = unexplainedErrors(errors, blocked);
@@ -864,7 +864,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     // leave enough behind to debug a stall
     await page.screenshot({ path: join(OUT, `${tag}-failure.png`) }).catch(() => {});
     const state = await app(page, () => {
-      const a = window.__domainPermit;
+      const a = window.__domainExpansion;
       const T = a.teach;
       return {
         mode: a.mode,
@@ -901,13 +901,13 @@ async function segmentation(browser, segModel, photo, info) {
     await page.evaluate((d) => window.__feed.load('person', d), `data:image/jpeg;base64,${readFileSync(photo).toString('base64')}`);
     await page.evaluate((it) => window.__feed.set([it]), { img: 'person', cx: 320, cy: 240, scale: Math.max(640 / info.w, 480 / info.h) });
     await page.click('#start-camera');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'library', { timeout: 120000 });
-    await page.waitForFunction(() => ['ready', 'failed', 'slow'].includes(window.__domainPermit.models.seg), { timeout: 60000 });
+    await page.waitForFunction(() => window.__domainExpansion.mode === 'library', { timeout: 120000 });
+    await page.waitForFunction(() => ['ready', 'failed', 'slow'].includes(window.__domainExpansion.models.seg), { timeout: 60000 });
     return opened;
   };
   const state = (page) =>
     app(page, () => {
-      const a = window.__domainPermit;
+      const a = window.__domainExpansion;
       let on = 0;
       for (const v of a.mask.smooth || []) if (v > 0.5) on++;
       const st = a.tracker.stats;
@@ -918,28 +918,28 @@ async function segmentation(browser, segModel, photo, info) {
     await step('segmentation:person-cutout', async () => {
       const { page, errors } = await open('&handFps=6');
       try {
-        await page.waitForFunction(() => window.__domainPermit.tracker.stats.segFrames > 15 || !window.__domainPermit.segEnabled, { timeout: 45000 }).catch(() => {});
+        await page.waitForFunction(() => window.__domainExpansion.tracker.stats.segFrames > 15 || !window.__domainExpansion.segEnabled, { timeout: 45000 }).catch(() => {});
         const m = await state(page);
         if (m.seg !== 'ready' || m.segFrames <= 15) throw new Error(`segmentation did not run: ${JSON.stringify(m)}`);
         await canvasPng(page, join(OUT, 'segmentation-live.png'));
-        await app(page, () => window.__domainPermit.startCast('sukuna', performance.now()));
+        await app(page, () => window.__domainExpansion.startCast('sukuna', performance.now()));
         await sleep(1500);
         const during = await app(page, () => {
-          const a = window.__domainPermit;
+          const a = window.__domainExpansion;
           const now = performance.now();
           return { person: a.stage.personAvailable({ ...a.stageState(now), now }) };
         });
-        await app(page, () => window.__domainPermit.freezeCastAt(3.0));
+        await app(page, () => window.__domainExpansion.freezeCastAt(3.0));
         await raf2(page);
         await raf2(page);
         const frozen = await app(page, () => {
-          const a = window.__domainPermit;
+          const a = window.__domainExpansion;
           const now = a.clockOverride ?? performance.now();
           return { person: a.stage.personAvailable({ ...a.stageState(now), now }), seg: a.models.seg, note: a.models.segNote, maskAgeMs: Math.round(now - a.mask.lastUpdate) };
         });
         await canvasPng(page, join(OUT, 'segmentation-cast-3s.png'));
-        await app(page, () => window.__domainPermit.releaseClock());
-        await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
+        await app(page, () => window.__domainExpansion.releaseClock());
+        await page.waitForFunction(() => !window.__domainExpansion.run, { timeout: 15000 });
         const after = await state(page);
         const ok = m.coverage > 0.05 && m.coverage < 0.95 && during.person && frozen.person && after.seg === 'ready' && errors.length === 0;
         record('segmentation:person-cutout', ok, { m, during, frozen, after, errors: errors.slice(0, 5), note: `segmenter ${m.src}; person covers ${(m.coverage * 100).toFixed(0)}% of the frame; ${m.segFrames} masks at ~${m.segMs} ms with hands at ~${m.handMs} ms; cutout during the cast: ${during.person} at 1.5 s, ${frozen.person} at 3 s (mask age ${frozen.maskAgeMs} ms); after: ${after.seg}${after.note ? ` (${after.note})` : ''}` });
@@ -951,7 +951,7 @@ async function segmentation(browser, segModel, photo, info) {
     await step('segmentation:starved-fallback', async () => {
       const { page, errors } = await open('');
       try {
-        await page.waitForFunction(() => window.__domainPermit.models.seg === 'slow', { timeout: 20000 }).catch(() => {});
+        await page.waitForFunction(() => window.__domainExpansion.models.seg === 'slow', { timeout: 20000 }).catch(() => {});
         const m = await state(page);
         const panel = await page.$eval('#stage-status', (e) => e.innerText).catch(() => '');
         const ok = m.seg === 'slow' && !m.segEnabled && errors.length === 0;
@@ -971,14 +971,14 @@ async function fakeDevice() {
     try {
       const { page, errors } = await openPage(browser, { path: '/?delegate=cpu', feed: false });
       await page.click('#start-camera');
-      await page.waitForFunction(() => window.__domainPermit.mode === 'library', { timeout: 120000 });
+      await page.waitForFunction(() => window.__domainExpansion.mode === 'library', { timeout: 120000 });
       await sleep(2500);
-      const s = await app(page, () => ({ w: window.__domainPermit.video.videoWidth, h: window.__domainPermit.video.videoHeight, frames: window.__domainPermit.tracker.stats.handFrames, ms: Math.round(window.__domainPermit.tracker.stats.handMs), mirror: window.__domainPermit.cam.mirror }));
+      const s = await app(page, () => ({ w: window.__domainExpansion.video.videoWidth, h: window.__domainExpansion.video.videoHeight, frames: window.__domainExpansion.tracker.stats.handFrames, ms: Math.round(window.__domainExpansion.tracker.stats.handMs), mirror: window.__domainExpansion.cam.mirror }));
       await page.screenshot({ path: join(OUT, 'fake-device-library.png') });
       record('fake-device:real-getUserMedia', s.w > 0 && s.frames > 10, { s, errors: errors.slice(0, 5), note: `${s.w}x${s.h}, ${s.frames} tracker frames at ~${s.ms} ms, mirror=${s.mirror}` });
       // Stop camera releases tracks
       await clickText(page, 'Stop camera');
-      const stopped = await app(page, () => window.__domainPermit.cam.status === 'off' && !window.__domainPermit.video.srcObject);
+      const stopped = await app(page, () => window.__domainExpansion.cam.status === 'off' && !window.__domainExpansion.video.srcObject);
       record('fake-device:stop-camera', stopped, { note: stopped ? 'tracks stopped, stream detached' : 'camera still attached' });
     } finally {
       await browser.close();

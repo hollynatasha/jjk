@@ -4,6 +4,9 @@
 
 import { FEATURE_VERSION } from './features.js';
 
+// Both ids keep the old project name on purpose. Renaming the database would
+// orphan signs people have already taught, and renaming the format tag would
+// make every training file exported before the rename fail to import.
 export const DB_NAME = 'holly-rd-domain-permit';
 export const EXPORT_FORMAT = 'holly-rd-domain-permit/training';
 const DB_VERSION = 1;

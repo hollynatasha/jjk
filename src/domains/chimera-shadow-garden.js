@@ -482,7 +482,7 @@ export default {
     g.restore();
     g.font = `500 14px ${FONTS.mono}`;
     g.fillStyle = rgba(C.mist, 0.7 * out * clamp01((t - t0 - 0.9) / 0.6));
-    drawTracked(g, 'permit hrd-03 · shadows on loan · @hollynst', W / 2, y + 52, 1.4, 'center');
+    drawTracked(g, 'expansion hrd-03 · shadows on loan · @hollynst', W / 2, y + 52, 1.4, 'center');
     g.restore();
   },
 };
