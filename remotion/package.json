@@ -1,0 +1,20 @@
+{
+  "name": "domain-permit-remotion",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pre-rendered domain backgrounds. Renders to ../public/domains/*.mp4.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "node render-all.mjs"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.8.2",
+    "@remotion/cli": "4.0.535",
+    "@remotion/three": "4.0.535",
+    "@types/three": "^0.186.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.535",
+    "three": "0.186.1"
+  }
+}
