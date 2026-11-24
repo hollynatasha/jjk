@@ -1,9 +1,8 @@
-// Copies the MediaPipe Tasks Vision WASM fileset out of node_modules into
-// public/mediapipe/wasm so the app never depends on a CDN at runtime.
-// The fileset version always matches the pinned @mediapipe/tasks-vision in
-// package-lock.json, which keeps the JS API and the WASM binary in lockstep.
-// Only the two variants FilesetResolver.forVisionTasks() picks from are copied
-// (SIMD and no-SIMD); the ES-module worker variant is never loaded by this app.
+// MediaPipe Tasks Vision WASM out of node_modules into public/mediapipe/wasm,
+// so no CDN at runtime. Copying from the pinned @mediapipe/tasks-vision in
+// package-lock.json keeps the JS API and the WASM binary in lockstep. Only the
+// SIMD and no-SIMD variants, which are what FilesetResolver.forVisionTasks()
+// picks from; the ES-module worker variant is never loaded here.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

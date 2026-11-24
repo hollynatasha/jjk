@@ -1,5 +1,6 @@
-// The right-hand panel, one view per mode, plus the DOM overlays on the stage.
-// Panels are rebuilt on mode changes; fast-changing readouts are patched by id.
+// Right-hand panel, one view per mode, plus the DOM overlays on the stage.
+// A mode change rebuilds the panel. Anything that moves per frame is patched
+// by id instead, see updateReadouts at the bottom.
 
 import { h, button, meter, setMeter, setText } from './dom.js';
 import { poseSVG } from './posecard.js';
@@ -18,32 +19,21 @@ export function renderPanel(app) {
   updateReadouts(app, performance.now());
 }
 
-// Hand-drawn arrows as SVG: the handwriting font has no arrow glyphs.
-const ARROW_LEFT = '<svg viewBox="0 0 36 18" width="36" height="18" focusable="false"><path d="M34 11c-8-5-18 3-30-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3 4 9l8 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const ARROW_UP = '<svg viewBox="0 0 18 30" width="16" height="26" focusable="false"><path d="M8 28c-3-8 4-15 1-25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 10l6-7 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const VIEWS = {
   landing(app) {
     const onFile = app.captures.length;
     return [
-      h('h1', null, 'Domain Permit'),
-      h('p', { class: 'lede' }, "Holly's R&D Department issues itself permits to open four domains with hand signs. The department has one employee. She also signs the approvals."),
-      h('div', { class: 'row' }, button('Start camera', () => app.startCamera(), { kind: 'primary', id: 'start-camera' }), button('Preview effects (simulation)', () => app.openSimulation(), { id: 'open-sim' })),
-      h('p', { class: 'annotation', 'aria-hidden': 'true' }, h('span', { class: 'arrow-side', svg: ARROW_LEFT }), h('span', { class: 'arrow-up', svg: ARROW_UP }), 'the stage exports exactly this frame'),
+      h('h1', null, 'Domain Expansion'),
+      h('p', { class: 'lede' }, 'Teach your webcam three hand signs. Hold one, and that domain opens around you.'),
       h(
-        'section',
-        null,
-        h('h3', null, 'How the ritual works'),
-        h(
-          'ol',
-          { class: 'fixes' },
-          h('li', null, 'Start the camera. MediaPipe finds 21 points on each hand, inside this tab.'),
-          h('li', null, 'Teach a sign twelve times from a few angles. Only the numbers describing your hand shape are saved.'),
-          h('li', null, 'Test your signs, then go live: hold one for 0.7 s and its domain takes over the stage.'),
-        ),
+        'div',
+        { class: 'row' },
+        button('Start camera', () => app.startCamera(), { kind: 'primary', id: 'start-camera' }),
+        button('Preview effects', () => app.openSimulation(), { id: 'open-sim' }),
       ),
-      onFile ? h('p', { class: 'okbox' }, `${onFile} captures on file from an earlier visit. Start the camera to use them, or retake and delete them from the cards.`) : null,
-      h('p', { class: 'fine' }, 'Unofficial fan-made project. Camera frames never leave this browser; no account, no upload, no microphone.'),
+      onFile ? h('p', { class: 'fine' }, `${onFile} captures on file from an earlier visit.`) : null,
+      h('p', { class: 'fine' }, 'By @hollynst. Nothing leaves this browser.'),
     ];
   },
 
@@ -89,9 +79,9 @@ const VIEWS = {
         'dl',
         { class: 'readout' },
         h('dt', null, 'Signs learned'),
-        h('dd', null, `${trained.length}/4`),
+        h('dd', null, `${trained.length}/${DOMAIN_IDS.length}`),
         h('dt', null, 'Ready (tested)'),
-        h('dd', null, `${ready.length}/4`),
+        h('dd', null, `${ready.length}/${DOMAIN_IDS.length}`),
         h('dt', null, 'Neutral poses'),
         h('dd', null, `${Math.min(negs, 8)}/8`),
         h('dt', null, 'Person segmenter'),
@@ -347,7 +337,7 @@ function segLabel(app) {
   return 'off';
 }
 
-/** Overlays on the stage. These are DOM, so they never reach the export canvas. */
+// Stage overlays. DOM, not canvas, so none of this lands in an export.
 export function renderStageUi(app) {
   const ui = app.dom.stageUi;
   const kids = [];
@@ -378,7 +368,6 @@ export function updateReadouts(app, now) {
   else status = `Tracking ${hands} hand${hands === 1 ? '' : 's'} · ${Math.round(st.handMs || 0)} ms/frame · ${app.tracker.delegate || ''} · segmentation ${app.segEnabled ? 'on' : 'off (overlay mode)'}`;
   setText('stage-status', status);
 
-  // loading progress
   if (app.mode === 'loading') {
     setMeter('load-hand', app.models.handProgress);
     if (app.models.handSrc) setText('hand-src', app.models.handSrc);
@@ -388,7 +377,7 @@ export function updateReadouts(app, now) {
   if (app.rec.phase === 'countdown') setText('countdown-n', String(Math.max(1, Math.ceil((app.rec.end - now) / 1000))));
   if (app.rec.phase === 'recording') setText('rec-dot', `● REC ${((now - app.rec.startedAt) / 1000).toFixed(1)} s`);
 
-  // notices expire
+  // a notice that expired or got replaced needs the overlay rebuilt
   const ui = app.dom.stageUi;
   const shown = ui.querySelector('.stage-notice');
   const latest = app.notices[app.notices.length - 1];

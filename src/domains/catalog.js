@@ -1,16 +1,19 @@
-// The four-card roster. Four domains, no more: the gesture library, matcher,
-// animations, sounds and tests all read from this list.
+// The roster. Gesture library, matcher, animations, sounds and tests all read
+// from this list.
 //
-// Official references point at the TV anime's official site episode pages
-// where each domain appears (or, for Higuruma, the page whose synopsis names
-// the courtroom domain). The hand-sign descriptions come from published
-// write-ups of the signs, not from an official diagram, so each card says
-// which parts are researched and which are a camera-friendly approximation.
+// kanji/reading are the Japanese name and its romanisation. DOM only: no
+// Japanese webfont is bundled, so a canvas export would risk missing glyphs.
+//
+// officialRef points at the TV anime site's episode page for each domain. The
+// sign descriptions come from published write-ups rather than an official
+// diagram, hence the split between researched and approximation per card.
 
 export const DOMAINS = [
   {
     id: 'gojo',
     animationId: 'unlimited-void',
+    kanji: '無量空処',
+    reading: 'Muryōkūsho',
     character: 'Gojo',
     domainName: 'Unlimited Void',
     title: 'UNLIMITED VOID',
@@ -38,6 +41,8 @@ export const DOMAINS = [
   {
     id: 'sukuna',
     animationId: 'malevolent-shrine',
+    kanji: '伏魔御廚子',
+    reading: 'Fukuma Mizushi',
     character: 'Sukuna',
     domainName: 'Malevolent Shrine',
     title: 'MALEVOLENT SHRINE',
@@ -65,6 +70,8 @@ export const DOMAINS = [
   {
     id: 'megumi',
     animationId: 'chimera-shadow-garden',
+    kanji: '嵌合暗翳庭',
+    reading: 'Kanzen Aneitei',
     character: 'Megumi',
     domainName: 'Chimera Shadow Garden',
     title: 'CHIMERA SHADOW GARDEN',
@@ -88,36 +95,6 @@ export const DOMAINS = [
       'Point both thumbs up, side by side.',
     ],
     friendlyNote: 'Variant: fingertip-deep interlace with palms 5 cm apart.',
-  },
-  {
-    id: 'higuruma',
-    animationId: 'deadly-sentencing',
-    character: 'Higuruma',
-    domainName: 'Deadly Sentencing',
-    title: 'DEADLY SENTENCING',
-    hands: 2,
-    accent: '#d4a64a',
-    officialRef: {
-      url: 'https://jujutsukaisen.jp/episodes/56.php',
-      label: 'TV anime official site, episode #56 (synopsis names 誅伏賜死 and the trial)',
-    },
-    secondaryRef: {
-      url: 'https://jujutsukaisen.jp/character/index.php',
-      label: 'Official character page (Culling Game cast)',
-    },
-    researchStatus: 'fan-made',
-    researched:
-      'Fan-made trigger. The courtroom premise is official; the exact canonical hand anatomy was not verified, so this pose is original.',
-    approximation: 'Upright oath palm plus a flat "gavel" hand. Already camera-friendly: ten fingertips, two clear shapes.',
-    wristGap: 'About one palm length.',
-    mustSee: 'All ten fingertips.',
-    steps: [
-      'Raise your right hand, palm to the camera, fingers together.',
-      'Hold your left hand flat, palm down, just below and beside it.',
-      'Point the flat hand’s fingers toward the upright palm.',
-      'Keep about a palm length between the wrists.',
-    ],
-    friendlyNote: 'Variant: same pose with a slightly wider gap between the wrists.',
   },
 ];
 

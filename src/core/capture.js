@@ -1,7 +1,7 @@
-// Teach-mode capture logic. A capture is taken only after the required hands
-// are tracked with high confidence and hold still for ~0.4 s. Between captures
-// the hands must drop (or move well away) so twelve captures are twelve
-// separate attempts, not twelve frames of one frozen hold.
+// Teach-mode capture. Nothing is taken until the required hands are tracked
+// with high confidence and held still for ~0.4s, and between captures the
+// hands have to drop (or move well away). Twelve captures should be twelve
+// attempts, not twelve frames of one frozen hold.
 
 import { featureDistance } from './features.js';
 
@@ -41,9 +41,9 @@ export class StableCapture {
   }
 
   /**
-   * Carries "drop your hands first" over from the previous prompt's capture.
-   * Without it, a pose still held when the prompt changes (fist -> peace, or the
-   * last neutral pose -> the first sign capture) would be stored under the new prompt.
+   * Carries "drop your hands first" over from the previous prompt. Without it a
+   * pose still held when the prompt changes (fist -> peace, or last neutral ->
+   * first sign) gets stored under the new prompt.
    */
   inheritRelease(prev) {
     if (prev && prev.waitingRelease) {
@@ -100,13 +100,13 @@ export class StableCapture {
       return { status: 'steadying', progress: Math.min(0.99, elapsed / o.stableMs), tip: 'Hold it…' };
     }
 
-    // Capture: first, middle and last frames of the stable window.
+    // keep the first, middle and last frames of the stable window
     const r = this.run;
     const picks = o.samples >= 3 ? [r[0], r[Math.floor(r.length / 2)], r[r.length - 1]] : [r[r.length - 1]];
     const minScore = Math.min(...r.map((x) => x.score));
     const maxOverlap = Math.max(...r.map((x) => x.overlap));
-    // Two hands given the same handedness usually means the tracker lost
-    // track of which is which: a sign of occluded or interlocked hands.
+    // two hands reported with the same handedness usually means the tracker
+    // lost which is which, i.e. occluded or interlocked hands
     const confusedLabels = count === 2 && r.filter((x) => x.sameLabel).length > r.length / 2;
     const chir = count === 1 ? majority(r.map((x) => x.chirality)) : null;
     const capture = {

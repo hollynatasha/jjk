@@ -1,7 +1,7 @@
 // The export canvas. Camera frame, segmentation, hand traces, charging cues,
-// domain worlds and titles are all composited here and nowhere else, so the
-// PNG and the recorded clip contain exactly what the stage shows. UI never
-// touches this canvas.
+// domain worlds and titles all composite here and nowhere else, so the saved
+// PNG and the recorded clip hold exactly what the stage showed. UI never draws
+// on this canvas.
 
 import { moduleFor, DOMAIN_MODULES } from '../domains/registry.js';
 import { phases, anchorsFromHands } from '../domains/engine.js';
@@ -9,10 +9,22 @@ import { HAND_CONNECTIONS } from '../handmodel/synthetic.js';
 import { applyVideoTransform, computeView, handsToCanvas, toCanvas } from './geometry.js';
 import { StandIn } from './standin.js';
 import { makeCanvas } from '../media/segmentation.js';
+// three.js is big and only a running cast needs it, so it loads in the
+// background and gets picked up whenever it lands.
+let ParticleLayerClass = null;
+let PARTICLE_FIELDS = {};
+import('./particles.js')
+  .then((m) => {
+    ParticleLayerClass = m.ParticleLayer;
+    PARTICLE_FIELDS = m.FIELDS;
+  })
+  .catch(() => {
+    ParticleLayerClass = null;
+  });
 import { TAU, rgba, FONTS, clamp01, ease, polygon } from './draw.js';
 import { makeRng } from '../core/rng.js';
 
-const PREVIEW_ORDER = ['gojo', 'sukuna', 'megumi', 'higuruma'];
+const PREVIEW_ORDER = ['gojo', 'sukuna', 'megumi'];
 
 let filterSupport = null;
 function canFilter(g) {
@@ -33,10 +45,15 @@ export class Stage {
     this.tint = makeCanvas(160, 120);
     this.temps = [];
     this.standIn = new StandIn(this.W, this.H);
-    this.simView = computeView(640, 480, this.W, this.H, true);
+    // simulated camera maps into the stand-in's 9:16 box, not the whole stage,
+    // or the fake hands sit somewhere other than the fake body
+    this.simView = { ...computeView(640, 480, 720, 1280, true), k: this.standIn.k, ox: this.standIn.ox };
     this.previewStates = {};
     this.frameId = 0;
     this.personBuiltFor = -1;
+    this.particles = null;
+    this.particleFor = null;
+    this.lastParticleAt = 0;
   }
 
   temp(i) {
@@ -296,12 +313,31 @@ export class Stage {
         if (a) moduleFor(s.charge.domain).charge(g, { a, low: s.low, reduced: s.reduced, W: this.W, H: this.H }, s.charge.p, s.time);
       }
     }
+    if (s.cast) this.credit(g);
     if (s.sim) this.watermark(g);
+  }
+
+  // Signature in the corner of every cast. In the stage composite rather than
+  // the page chrome, so it rides along on the PNG and the clip, which are the
+  // things that leave the browser.
+  credit(g) {
+    g.save();
+    g.font = `500 13px ${FONTS.mono}`;
+    g.textBaseline = 'alphabetic';
+    g.textAlign = 'right';
+    const x = this.W - 20;
+    const y = this.H - 18;
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.fillText('@hollynst', x + 1, y + 1);
+    g.fillStyle = 'rgba(236,231,219,0.62)';
+    g.fillText('@hollynst', x, y);
+    g.restore();
   }
 
   renderCast(g, s) {
     const run = s.cast;
     const t = run.t(s.now);
+    if (s.clips) s.clips.sync(run.module.id, t);
     const ph = phases(t, !!run.record.reduced);
     const live = s.hands && s.hands.length ? anchorsFromHands(s.hands) : null;
     const a = run.anchors(s.now, live) || anchorsFromHands(handsToCanvas(this.standIn.frameFor(run.record.domainId, 0), this.simView));
@@ -314,7 +350,63 @@ export class Stage {
       reduced: !!run.record.reduced,
       hist: (d) => run.anchorsAtTime(t - d),
     });
+    this.particleCall = (gg) => this.drawParticles(gg, run, s, t, a);
     run.module.render(g, run.state, f);
+    // a domain that never called f.particles gets them over the top anyway
+    if (this.particleCall) this.particleCall(g);
+    this.particleCall = null;
+  }
+
+  /**
+   * Builds the particle layer and one point cloud per domain before the first
+   * cast needs it. Building a cloud mid-cast costs a visible frame.
+   */
+  prewarmParticles(low = false) {
+    if (this.particlesWarm || !ParticleLayerClass) return this.particlesWarm === true;
+    if (!this.particles) {
+      this.particles = new ParticleLayerClass(this.W, this.H);
+      if (!this.particles.ok) {
+        this.particlesWarm = true;
+        return true;
+      }
+    }
+    // render each cloud once so the buffers reach the GPU and the shaders
+    // compile here, off-cast, not on the first frame that shows them
+    for (const id of Object.keys(PARTICLE_FIELDS)) {
+      this.particles.build(id, low);
+      this.particles.render();
+    }
+    this.particles.build('unlimited-void', low);
+    this.particleFor = 'unlimited-void';
+    this.particlesWarm = true;
+    return true;
+  }
+
+  drawParticles(g, run, s, t, a) {
+    if (s.low && s.reduced) return;
+    if (!this.particles) {
+      if (!ParticleLayerClass) return;
+      this.particles = new ParticleLayerClass(this.W, this.H);
+      if (!this.particles.ok) return;
+    }
+    const layer = this.particles;
+    if (!layer.ok) return;
+    layer.resize(this.W, this.H);
+    const id = run.module.id;
+    if (this.particleFor !== id || !layer.points) {
+      layer.build(id, !!s.low);
+      this.particleFor = id;
+    }
+    const dt = this.lastParticleAt ? Math.min(0.06, Math.max(0, t - this.lastParticleAt)) : 1 / 60;
+    this.lastParticleAt = t;
+    layer.update(dt, t, a ? a.mid : null);
+    const canvas = layer.render();
+    if (!canvas) return;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = 0.85;
+    g.drawImage(canvas, 0, 0, this.W, this.H);
+    g.restore();
   }
 
   env(s, extra) {
@@ -330,23 +422,31 @@ export class Stage {
       },
       portalRoom: (gg, o) => this.drawPortal(gg, s, o),
       temp: (i) => this.temp(i),
+      // domains call this where the particle field belongs in their own stack,
+      // behind the performer
+      particles: (gg) => {
+        const call = this.particleCall;
+        this.particleCall = null;
+        if (call) call(gg);
+      },
+      clip: s.clip || null,
       overlay: !this.personAvailable(s),
       ...extra,
     };
   }
 
-  /** Landing loop: four worlds in two seconds (eight with reduced motion), stand-in performer. */
+  /** Landing loop: PREVIEW_ORDER in two seconds, eight with reduced motion, stand-in performer. */
   renderPreview(g, s) {
     const loop = s.reduced ? 8 : 2;
-    const slot = loop / 4;
+    const slot = loop / PREVIEW_ORDER.length;
     const fade = s.reduced ? 0.6 : 0.16;
     const tau = s.time % loop;
-    const idx = Math.floor(tau / slot);
+    const idx = Math.min(PREVIEW_ORDER.length - 1, Math.floor(tau / slot));
     const local = tau - idx * slot;
     const cur = PREVIEW_ORDER[idx];
     this.previewFrame(g, s, cur, 2.4 + local * 0.8);
     if (local > slot - fade) {
-      const nxt = PREVIEW_ORDER[(idx + 1) % 4];
+      const nxt = PREVIEW_ORDER[(idx + 1) % PREVIEW_ORDER.length];
       const T = this.temp(3);
       const tg = T.getContext('2d');
       tg.setTransform(1, 0, 0, 1, 0, 0);
@@ -385,7 +485,7 @@ export class Stage {
     g.restore();
   }
 
-  /** Copies the current composite (used for the peak-frame PNG). */
+  // copy of the current composite, for the peak-frame PNG
   snapshot(target) {
     const tg = target.getContext('2d');
     tg.setTransform(1, 0, 0, 1, 0, 0);

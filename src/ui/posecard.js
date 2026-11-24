@@ -1,6 +1,6 @@
-// Original pose-card line drawings, generated from the same procedural hand
-// the tests use. Nothing is traced from anime frames. The drawing shows the
-// front-camera (mirrored, selfie) view; "flip" mirrors it for the other hand.
+// Pose-card line drawings, built from the same procedural hand the tests use.
+// Nothing traced from anime frames. Everything is drawn in the front-camera
+// (mirrored, selfie) view, and flipped mirrors it for the other hand.
 
 import { SIGN_SCENES, scenePoints } from '../handmodel/poses.js';
 import { DOMAINS, domainById } from '../domains/catalog.js';
@@ -21,10 +21,9 @@ const NOTES = {
   gojo: { at: (H) => mid(H[0].pts[6], H[0].pts[10]), text: 'middle over index', must: [[0, 8], [0, 12]] },
   sukuna: { at: (H) => mid(H[0].pts[12], H[1].pts[12]), text: 'tips meet in a peak', must: [[0, 12], [1, 12], [0, 16], [1, 16]] },
   megumi: { at: (H) => mid(H[0].pts[10], H[1].pts[10]), text: 'knuckles form a mountain', must: [[0, 4], [1, 4]] },
-  higuruma: { at: (H) => H[1].pts[12], text: 'flat gavel hand', must: [] },
 };
 // A slight top-down view where a flat hand would otherwise be seen edge-on.
-const DRAW_PITCH = { gojo: 0, sukuna: -8, megumi: -14, higuruma: -24 };
+const DRAW_PITCH = { gojo: 0, sukuna: -8, megumi: -14 };
 
 const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
 const f1 = (n) => Math.round(n * 10) / 10;
@@ -70,7 +69,7 @@ export function poseGeometry(domainId, variant = 'friendly', flipped = false, bo
   return hands;
 }
 
-/** The line drawing itself (no surrounding card), as SVG elements. */
+// Just the drawing, no card around it.
 export function handLineArt(hands, { lw = 1.6, ink = INK, paper = PAPER } = {}) {
   const parts = [];
   hands.forEach((hh) => {
@@ -112,7 +111,7 @@ function arrow(from, to, label, { size = 14, anchor = 'start' } = {}) {
   );
 }
 
-/** Square drawing for a card: hands + hand-drawn annotations. */
+// Square drawing for a card: the hands plus the pencil annotations.
 export function poseSVG(domainId, { variant = 'friendly', flipped = false, size = 300, annotate = true, title = null, ghost = false } = {}) {
   const d = domainById(domainId);
   const hands = poseGeometry(domainId, variant === 'custom' ? 'friendly' : variant, flipped, { x: 0, y: 0, w: size, h: size, pad: size * 0.15 });
@@ -149,7 +148,7 @@ export function poseSVG(domainId, { variant = 'friendly', flipped = false, size 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" role="img" aria-label="${label}"><rect width="${size}" height="${size}" fill="${PAPER}"/>${body}${notes.join('')}</svg>`;
 }
 
-/** Standalone printable pose card (used to generate the files in src/assets/pose-cards). */
+// Standalone printable card. This is what generated the files in src/assets/pose-cards.
 export function poseCardFile(domainId) {
   const d = domainById(domainId);
   const W = 600;
@@ -173,7 +172,7 @@ export function poseCardFile(domainId) {
 <rect width="${W}" height="${H}" fill="${PAPER}"/>
 <rect x="14" y="14" width="${W - 28}" height="${H - 28}" fill="none" stroke="${INK}" stroke-width="1.5"/>
 <text x="40" y="62" font-family="'Instrument Serif', Georgia, serif" font-size="38" fill="${INK}">${esc(d.character)} / ${esc(d.domainName)}</text>
-<text x="40" y="88" font-family="'IBM Plex Mono', monospace" font-size="12" fill="${INK}" opacity="0.75">Holly's R&amp;D Department · pose card · unofficial fan-made</text>
+<text x="40" y="88" font-family="'IBM Plex Mono', monospace" font-size="12" fill="${INK}" opacity="0.75">Holly's R&amp;D Department · pose card · by @hollynst</text>
 <g transform="translate(40,104)"><rect width="520" height="520" fill="${PAPER}"/>${drawing}</g>
 <g transform="translate(${W - 280},${612}) rotate(-4)"><rect width="240" height="34" fill="${PAPER}" stroke="${PENCIL}" stroke-width="2"/><text x="120" y="23" text-anchor="middle" font-family="'IBM Plex Mono', monospace" font-size="12" font-weight="700" fill="${PENCIL}">${status}</text></g>
 ${text.join('\n')}

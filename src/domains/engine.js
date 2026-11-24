@@ -1,11 +1,11 @@
-// Shared timed state engine. Every domain runs on the same clock:
+// Shared clock. Every domain runs on these phases:
 //   0.00-0.25 s  hand charge
 //   0.25-1.25 s  spatial rupture
 //   1.25-5.80 s  sustained world
 //   5.80-7.50 s  dissolve
-// Reduced motion stretches the rupture and dissolve into slow wipes.
-// Each cast is a record { domainId, seed, track, ... }; replaying the record
-// re-runs the same seeded choreography along the same anchor path.
+// Reduced motion stretches rupture and dissolve into slow wipes.
+// A cast record keeps { domainId, seed, track }, so replaying it re-runs the
+// same seeded choreography down the same anchor path.
 
 import { makeRng } from '../core/rng.js';
 import { ease, clamp01 } from '../render/draw.js';
@@ -30,7 +30,7 @@ export function phases(t, reduced = false) {
   return { t, charge, rupture, sustain, dissolve, inWorld, outWorld, world: inWorld * (1 - outWorld), total: tl.total, tl };
 }
 
-/** Anchor geometry from hands already mapped to stage pixels. */
+/** anchor geometry from hands already mapped to stage pixels */
 export function anchorsFromHands(hands) {
   if (!hands || !hands.length) return null;
   const hs = hands.map((h) => {
@@ -63,7 +63,7 @@ function lerpAnchors(a, b, t) {
   return { hands, mid: L(a.mid, b.mid), tips: [L(a.tips[0], b.tips[0]), L(a.tips[1], b.tips[1])], tipMid: L(a.tipMid, b.tipMid), size: a.size + (b.size - a.size) * t };
 }
 
-/** One running (or replayed) cast. */
+/** One cast, live or replayed. */
 export class CastRun {
   constructor(record, module, { W, H }) {
     this.record = record;
@@ -97,7 +97,7 @@ export class CastRun {
     return this.t(now) >= this.total;
   }
 
-  /** Live casts record anchors at ~30 Hz; replays read them back. If hands vanish, the last anchor holds. */
+  // Live casts record anchors at ~30 Hz, replays read them back. If the hands vanish the last anchor holds.
   anchors(now, live) {
     const t = this.t(now);
     if (this.replay) {
@@ -119,7 +119,7 @@ export class CastRun {
     return this.last;
   }
 
-  /** Anchors at an earlier cast time (for delayed shadow copies). */
+  // anchors at an earlier cast time, for the delayed shadow copies
   anchorsAtTime(tq) {
     const tr = this.track;
     if (!tr.length || tq < 0) return null;
@@ -131,7 +131,6 @@ export class CastRun {
     return lerpAnchors(a.a, b.a, k);
   }
 
-  /** The record to keep for Replay. */
   snapshot() {
     return { ...this.record, track: this.track.slice(), anchor0: this.anchor0 };
   }

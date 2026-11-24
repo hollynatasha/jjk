@@ -1,8 +1,8 @@
-// MediaPipe's native C++ logging reaches the page through console.error and
-// console.warn, e.g. "INFO: Created TensorFlow Lite XNNPACK delegate for CPU."
-// or "W1011 16:56:21.392000 1 gl_context.cc:1135] OpenGL error checking is
-// disabled". Those informational/warning lines go to console.debug instead, so
-// a red console means a real problem. Native E/F lines and everything else pass through.
+// MediaPipe's native C++ logs arrive through console.error/console.warn, e.g.
+// "INFO: Created TensorFlow Lite XNNPACK delegate for CPU." or "W1011
+// 16:56:21.392000 1 gl_context.cc:1135] OpenGL error checking is disabled".
+// Those go to console.debug so a red console means a real problem; E/F lines
+// and everything else pass through.
 const NATIVE_CHATTER = /^(INFO: |[IW]\d{4} \d\d:\d\d:\d\d\.\d+\s)/;
 const routed = new WeakSet();
 export function routeNativeLogs(con = console) {

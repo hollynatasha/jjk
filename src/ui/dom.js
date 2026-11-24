@@ -1,5 +1,4 @@
-// Minimal DOM helpers. No framework; panels are rebuilt on mode changes and
-// live readouts are patched in place.
+// DOM helpers. Panels get rebuilt on a mode change, readouts patched in place.
 
 export function h(tag, props, ...children) {
   const el = document.createElement(tag);
@@ -7,7 +6,14 @@ export function h(tag, props, ...children) {
     for (const [k, v] of Object.entries(props)) {
       if (v === null || v === undefined || v === false) continue;
       if (k === 'class') el.className = v;
-      else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k === 'style' && typeof v === 'object') {
+        // setProperty, not plain assignment: custom props (--accent) are
+        // invisible to style[prop] on a CSSStyleDeclaration
+        for (const [prop, val] of Object.entries(v)) {
+          if (prop.startsWith('--')) el.style.setProperty(prop, val);
+          else el.style[prop] = val;
+        }
+      }
       else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
       else if (k === 'svg') el.innerHTML = v; // only ever our own generated SVG markup
       else if (v === true) el.setAttribute(k, '');
@@ -79,12 +85,17 @@ export function setText(id, text) {
   if (el && el.textContent !== text) el.textContent = text;
 }
 
-/** Inline icons drawn for this app (simple geometric strokes). */
+// Icons, drawn here as inline SVG. Simple strokes, no icon font.
 export const ICON = {
   external: '<svg viewBox="0 0 16 16" aria-hidden="true" width="12" height="12" focusable="false"><path d="M6 3H3v10h10v-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9 2h5v5M14 2 7.5 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   sound: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z" fill="currentColor"/><path d="M13 7c1.2 1.6 1.2 4.4 0 6M15.5 5c2.2 2.8 2.2 7.2 0 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   muted: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3z" fill="currentColor"/><path d="M13 8l4 4M17 8l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-  spark: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v5M10 13v5M2 10h5M13 10h5M5 5l2.5 2.5M12.5 12.5L15 15M15 5l-2.5 2.5M7.5 12.5L5 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  // cursed-energy burst: four long spikes, four short, slightly off-balance
+  spark: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 11.2 8 10 10 8.8 8Z" fill="currentColor"/><path d="M10 18.5 8.8 12 10 10l1.2 2Z" fill="currentColor"/><path d="M18.5 10 12 11.2 10 10l2-1.2Z" fill="currentColor"/><path d="M1.5 10 8 8.8 10 10l-2 1.2Z" fill="currentColor"/><path d="M4.6 4.6 8.4 8.4M15.4 15.4l-3.8-3.8M15.4 4.6l-3.8 3.8M4.6 15.4l3.8-3.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
   motion: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h9M3 6h5M3 14h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="15" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
-  folder: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5h5l1.5 1.5h8.5v8.5h-15z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  // ofuda: a paper talisman slip with its seal marks
+  tall: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="2.5" width="7" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  wide: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="6" width="15" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+  full: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.5V3h4.5M16.5 7.5V3H12M3 12.5V17h4.5M16.5 12.5V17H12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  folder: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 2.5h6v15l-3-2.5-3 2.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.5 6h3M8.5 9h3M8.5 12h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
 };

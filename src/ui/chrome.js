@@ -8,6 +8,8 @@ export function renderHeader(app) {
   const mute = document.getElementById('btn-mute');
   const fx = document.getElementById('btn-effects');
   const motion = document.getElementById('btn-motion');
+  const aspect = document.getElementById('btn-aspect');
+  const full = document.getElementById('btn-full');
   const data = document.getElementById('btn-data');
   const muted = app.settings.muted;
   mute.innerHTML = `${muted ? ICON.muted : ICON.sound}<span class="tool-label">${muted ? 'Sound off' : 'Sound on'}</span>`;
@@ -18,6 +20,15 @@ export function renderHeader(app) {
   const m = app.settings.motion;
   motion.innerHTML = `${ICON.motion}<span class="tool-label">Motion: ${m === 'auto' ? `auto (${app.reduced ? 'reduced' : 'full'})` : m}</span>`;
   motion.setAttribute('aria-label', `Motion ${m}${m === 'auto' ? `, currently ${app.reduced ? 'reduced' : 'full'}` : ''}. Change`);
+  const wide = app.settings.aspect === 'landscape';
+  aspect.innerHTML = `${wide ? ICON.wide : ICON.tall}<span class="tool-label">Stage: ${wide ? '16:9' : '9:16'}</span>`;
+  aspect.setAttribute('aria-pressed', String(wide));
+  aspect.setAttribute('aria-label', `Stage shape ${wide ? '16 by 9, landscape' : '9 by 16, portrait'}. Change (A)`);
+  aspect.disabled = !!app.run || app.rec.phase !== 'idle';
+  const isFull = !!document.fullscreenElement;
+  full.innerHTML = `${ICON.full}<span class="tool-label">${isFull ? 'Exit full screen' : 'Full screen'}</span>`;
+  full.setAttribute('aria-pressed', String(isFull));
+  full.setAttribute('aria-label', `${isFull ? 'Leave full screen' : 'Fill the screen with the stage'} (F)`);
   data.innerHTML = `${ICON.folder}<span class="tool-label">Training data</span>`;
   data.setAttribute('aria-label', 'Training data: export, import or delete');
   if (!wired) {
@@ -28,11 +39,20 @@ export function renderHeader(app) {
     });
     fx.addEventListener('click', () => app.toggleEffects());
     motion.addEventListener('click', () => app.cycleMotion());
+    aspect.addEventListener('click', () => app.toggleAspect());
+    full.addEventListener('click', () => app.toggleFullscreen());
+    document.addEventListener('fullscreenchange', () => renderHeader(app));
     data.addEventListener('click', () => app.openDataDialog());
+    // these two live in index.html, not in a panel view
+    const aboutData = document.getElementById('about-data');
+    if (aboutData) aboutData.addEventListener('click', () => app.openDataDialog());
+    const ctaStart = document.getElementById('cta-start');
+    if (ctaStart) ctaStart.addEventListener('click', () => app.startCamera());
   }
 }
 
-/** Builds the training-data dialog; rebuilt after an import or delete so counts and buttons stay true. */
+// Rebuilt after an import or delete, otherwise the counts and the disabled
+// states go stale.
 export function renderDataDialog(app, message = '') {
   const dlg = app.dom.dialog;
   const counts = DOMAINS.map((d) => `${d.character} ${app.positives(d.id).length}/12`).join(' · ');
@@ -79,11 +99,11 @@ export function renderDataDialog(app, message = '') {
     h(
       'div',
       { class: 'stack' },
-      button('Export training data (.json)', () => app.exportTraining(), { kind: 'secondary' }),
+      button('Export training data (.json)', () => app.exportTraining(), { kind: 'primary' }),
       h('label', { class: 'btn btn-secondary', for: 'import-file', tabindex: '0', onKeydown: (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), file.click()) }, 'Import training data…'),
       file,
       del,
-      button('Close', () => dlg.close(), { kind: 'primary' }),
+      button('Close', () => dlg.close()),
     ),
     status,
   );

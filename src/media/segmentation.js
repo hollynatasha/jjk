@@ -1,6 +1,6 @@
-// Turns MediaPipe Image Segmenter confidence masks into a small, feathered,
-// temporally smoothed alpha mask, plus a short history of masks for the
-// delayed-silhouette effect. Only kept in memory, never stored.
+// Image Segmenter confidence masks to a small feathered alpha mask, smoothed
+// over time, plus a short history for the delayed-silhouette effect. In memory
+// only, never stored.
 
 export class PersonMask {
   constructor({ width = 160 } = {}) {
@@ -25,10 +25,7 @@ export class PersonMask {
     this.bbox = null;
   }
 
-  /**
-   * mask: Float32Array (w*h) of person probability, row-major, in raw video
-   * orientation (not mirrored).
-   */
+  /** mask: Float32Array (w*h) of person probability, row-major, raw video orientation (not mirrored). */
   update(mask, w, h, now) {
     const mw = this.mw;
     const mh = Math.max(1, Math.round((mw * h) / w));
@@ -111,7 +108,7 @@ export class PersonMask {
     return best.canvas;
   }
 
-  /** Mask is stale if segmentation stopped producing updates. */
+  /** false once segmentation stops producing updates */
   fresh(now, maxAgeMs = 1500) {
     return this.available && now - this.lastUpdate < maxAgeMs;
   }

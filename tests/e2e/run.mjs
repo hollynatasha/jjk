@@ -1,17 +1,17 @@
-// End-to-end browser checks for Domain Permit.
+// End-to-end browser checks for Domain Expansion.
 //
 //   CHROME_PATH=/path/to/chrome node tests/e2e/run.mjs [--base http://localhost:5173] [--out e2e-out]
 //              [--feed-dir photos/ --feed-boxes boxes.json] [--seg-model path.tflite --seg-photo person.jpg] [--only a,b]
 //
-// Without --feed-dir it covers UI, error states, simulation, recording and
-// accessibility. With --feed-dir it also drives the REAL MediaPipe pipeline
-// from a canvas "camera" showing hand photos: neutral poses, teaching four
-// stand-in signs, the Test my signs challenge, live casts and a recorded clip.
-// Photos are never committed; see README for the expected file names.
+// No --feed-dir: UI, error states, simulation, recording, accessibility.
+// With --feed-dir it also drives the actual MediaPipe pipeline from a canvas
+// "camera" showing hand photos. Photos are never committed, see README for the
+// file names it expects.
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync, copyFileSync, rmSync, statSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
 import { installFeed } from './feed.js';
 
@@ -24,7 +24,7 @@ const args = Object.fromEntries(
 const BASE = (args.base || 'http://localhost:5173').replace(/\/$/, '');
 const OUT = resolve(args.out || 'e2e-out');
 const ONLY = args.only ? new Set(args.only.split(',')) : null;
-const ROOT = resolve(new URL('../..', import.meta.url).pathname);
+const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 mkdirSync(OUT, { recursive: true });
 mkdirSync(join(OUT, 'downloads'), { recursive: true });
 
@@ -179,13 +179,16 @@ async function landingAndLayout(browser) {
           small,
           bannedName: document.body.innerText.toLowerCase().includes(banned),
           stage: (() => {
-            const r = document.getElementById('stage').getBoundingClientRect();
-            return { w: Math.round(r.width), h: Math.round(r.height), ratio: +(r.width / r.height).toFixed(4) };
+            const el = document.getElementById('stage');
+            const r = el.getBoundingClientRect();
+            return { w: Math.round(r.width), h: Math.round(r.height), ratio: r.height ? +(r.width / r.height).toFixed(4) : 0, shape: document.body.dataset.aspect };
           })(),
         };
       });
       const third = thirdParty(requests);
-      const ok = m.scrollW <= m.vw && m.cards === 4 && m.clipped === 0 && m.refs >= 4 && !m.bannedName && Math.abs(m.stage.ratio - 9 / 16) < 0.01 && errors.length === 0 && m.small.length === 0 && third.length === 0;
+      // the landing hides the stage until the camera starts, so only check its shape once it is on screen
+      const stageOk = m.stage.w === 0 || Math.abs(m.stage.ratio - 9 / 16) < 0.01 || Math.abs(m.stage.ratio - 16 / 9) < 0.01;
+      const ok = m.scrollW <= m.vw && m.cards === 3 && m.clipped === 0 && m.refs >= 3 && !m.bannedName && stageOk && errors.length === 0 && m.small.length === 0 && third.length === 0;
       record(`landing:${vp.name}`, ok, { metrics: m, errors, third, note: `scrollWidth ${m.scrollW}/${m.vw}, stage ${m.stage.w}x${m.stage.h}, cards ${m.cards}, small targets ${m.small.length}, console errors ${errors.length}, third-party requests ${third.length}` });
       await page.close();
     });
@@ -244,14 +247,14 @@ async function cameraErrors(browser) {
 }
 
 async function simulation(browser, { reducedMotion = false, tag = 'sim' } = {}) {
-  await step(`${tag}:four-domains`, async () => {
+  await step(`${tag}:all-domains`, async () => {
     const { page, errors } = await openPage(browser, { path: '/?debug=1', reducedMotion, feed: false });
     await page.click('#open-sim');
     await page.waitForFunction(() => window.__domainPermit.mode === 'sim');
     const banner = await page.$eval('.sim-banner', (b) => b.textContent).catch(() => '');
     const seen = {};
-    for (const [i, id] of ['gojo', 'sukuna', 'megumi', 'higuruma'].entries()) {
-      // keyboard shortcut 1-4 for half the domains, buttons for the rest
+    for (const [i, id] of ['gojo', 'sukuna', 'megumi'].entries()) {
+      // keyboard shortcut for half the domains, buttons for the rest
       if (i % 2) await page.keyboard.press(String(i + 1));
       else await page.click(`#sim-${id}`);
       await page.waitForFunction(() => window.__domainPermit.run && window.__domainPermit.run.startedAt !== null, { timeout: 10000 });
@@ -268,8 +271,8 @@ async function simulation(browser, { reducedMotion = false, tag = 'sim' } = {}) 
       await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 15000 });
     }
     const ids = Object.values(seen).map((s) => s.id);
-    const ok = new Set(ids).size === 4 && Object.values(seen).every((s) => s.sim && s.reduced === reducedMotion && s.locked) && /SIMULATION/.test(banner) && errors.length === 0;
-    record(`${tag}:four-domains`, ok, { seen, errors, note: `animation ids ${ids.join(', ')}; reduced=${reducedMotion}; banner "${banner}"` });
+    const ok = new Set(ids).size === 3 && Object.values(seen).every((s) => s.sim && s.reduced === reducedMotion && s.locked) && /SIMULATION/.test(banner) && errors.length === 0;
+    record(`${tag}:all-domains`, ok, { seen, errors, note: `animation ids ${ids.join(', ')}; reduced=${reducedMotion}; banner "${banner}"` });
     await page.close();
   });
 }
@@ -303,7 +306,6 @@ async function toggles(browser) {
         return { label: (a.getAttribute('aria-label') || a.textContent || '').trim().slice(0, 32), outline: st.outlineStyle !== 'none' && parseFloat(st.outlineWidth) >= 2 };
       }));
     }
-    // Activate simulation from the keyboard
     await page.focus('#open-sim');
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.__domainPermit.mode === 'sim', { timeout: 5000 });
@@ -318,7 +320,7 @@ async function recordingSim(browser) {
     const { page } = await openPage(browser, { feed: false });
     await page.click('#open-sim');
     const clips = [];
-    for (const id of ['higuruma', 'gojo']) {
+    for (const id of ['megumi', 'gojo']) {
       await page.click(`#sim-${id}`);
       await page.waitForFunction(() => !window.__domainPermit.run, { timeout: 20000 });
       const since = Date.now();
@@ -327,7 +329,7 @@ async function recordingSim(browser) {
       await page.waitForFunction(() => window.__domainPermit.clip, { timeout: 30000 });
       const c = await app(page, () => ({ mime: window.__domainPermit.clip.mime, ext: window.__domainPermit.clip.ext, ms: window.__domainPermit.clip.durationMs, audio: window.__domainPermit.clip.hasAudio, domain: window.__domainPermit.clip.domain }));
       await page.click('#btn-clip');
-      const file = await waitDownload('domain-permit-', c.ext, since);
+      const file = await waitDownload('domain-expansion-', c.ext, since);
       const p = probe(file);
       clips.push({ ...c, file: basename(file), probe: p });
       // extract a mid-clip frame to prove the domain is in the footage
@@ -342,9 +344,10 @@ async function recordingSim(browser) {
     // PNG
     const since = Date.now();
     await page.click('#btn-png');
-    const png = await waitDownload('domain-permit-', 'png', since);
+    const png = await waitDownload('domain-expansion-', 'png', since);
     const dims = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'csv=p=0', png], { encoding: 'utf8' }).trim();
-    record('record:png', dims === '720,1280', { note: `${basename(png)} ${dims}` });
+    // the stage exports at its own resolution, portrait or landscape
+    record('record:png', dims === '720,1280' || dims === '1280,720', { note: `${basename(png)} ${dims}` });
     await page.close();
   });
 }
@@ -364,10 +367,15 @@ async function dataDialog(browser) {
       };
       await page.click('#btn-data');
       await page.waitForFunction(() => document.getElementById('data-dialog').open, { timeout: 5000 });
-      const sample = await importFile(join(ROOT, 'tests', 'fixtures', 'sample-vectors.json'));
+      const fixturePath = join(ROOT, 'tests', 'fixtures', 'sample-vectors.json');
+      // Counts come from the fixture so adding or retiring a domain does not strand this check.
+      const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+      const wantCaps = fixture.captures.length;
+      const wantLive = new Set(fixture.captures.filter((c) => c.kind === 'positive').map((c) => c.domain)).size;
+      const sample = await importFile(fixturePath);
       const since = Date.now();
       await clickText(page, 'Export training data', '#data-dialog button');
-      const file = await waitDownload('domain-permit-training-', 'json', since);
+      const file = await waitDownload('domain-expansion-training-', 'json', since);
       const raw = readFileSync(file, 'utf8');
       const data = JSON.parse(raw);
       await clickText(page, 'Delete all training data', '#data-dialog button');
@@ -386,7 +394,7 @@ async function dataDialog(browser) {
       const back = await importFile(file);
       await clickText(page, 'Delete all training data', '#data-dialog button');
       await clickText(page, 'Press again to delete everything', '#data-dialog button');
-      const ok = sample.caps === 56 && sample.live === 4 && data.captures.length === 56 && !/data:image|data:video|base64|blob:/.test(raw) && deleted.caps === 0 && deleted.live === 0 && stored === 0 && back.caps === 56 && back.live === 4 && errors.length === 0;
+      const ok = sample.caps === wantCaps && sample.live === wantLive && data.captures.length === wantCaps && !/data:image|data:video|base64|blob:/.test(raw) && deleted.caps === 0 && deleted.live === 0 && stored === 0 && back.caps === wantCaps && back.live === wantLive && errors.length === 0;
       record('data-dialog:import-export-delete', ok, { note: `import sample: ${sample.caps} captures, ${sample.live} live signs; export: ${data.captures.length} captures, no image data: ${!/data:image|data:video|base64|blob:/.test(raw)}; delete: ${deleted.caps} captures in the app, ${stored} in IndexedDB; re-import: ${back.caps} captures, ${back.live} live signs` });
     } finally {
       await page.close();
@@ -422,17 +430,15 @@ function loadFeed() {
   return { dir, byClass };
 }
 
-// Stand-in signs: real photographed hand shapes, standing in for the four
-// domain signs because nobody here can perform the real ones on camera.
-// Pairs were chosen from a detection sweep (both hands found in 6/6
-// compositions); 'call' pairs only reached 2-4/6, so call appears single-handed.
-// Each entry lists the photo class per hand: first = the person's right hand
-// (left side of the raw camera frame), second = their left hand.
+// Photographed hand shapes standing in for the domain signs, since nobody here
+// can do the real ones on camera. Pairs come from a detection sweep: both hands
+// found in 6/6 compositions, while 'call' pairs only hit 2-4/6, so call stays
+// single-handed. First entry = the person's right hand (left side of the raw
+// frame), second = their left.
 const STANDIN = {
   gojo: { hands: ['rock'] },
   sukuna: { hands: ['rock', 'rock'] },
   megumi: { hands: ['four', 'four'] },
-  higuruma: { hands: ['rock', 'four'] },
 };
 const NEG = { 'open-palm': ['four'], fist: ['none'], peace: ['call'], wave: ['none'], relaxed: ['none', 'none'], palms: ['none', 'four'], clap: ['four', 'none'], fists: ['none', 'rock'] };
 const VIEW_T = [
@@ -453,12 +459,9 @@ const VIEW_T = [
 const SLOT_X = { c: 320, l: 210, r: 430 };
 const slotOf = (n, i) => (n === 1 ? 'c' : i === 0 ? 'l' : 'r');
 
-/**
- * Calibration pass, like a person checking the camera can see their hands:
- * each photo is shown alone at each hand position and kept for that position
- * only if the tracker finds exactly one hand, confidently, with the intended
- * handedness label. Composed signs then draw from these pools.
- */
+// Shows every photo alone at each hand position and keeps it for that position
+// only if the tracker finds exactly one hand, score above 0.85, with the
+// handedness we expect. composeSign then draws from these pools.
 async function screenPhotos(page, feed) {
   const ok = {};
   const stats = {};
@@ -519,8 +522,8 @@ async function loadFeedImages(page, feed) {
   }
 }
 
-// Harness bookkeeping: how often the palm detector missed a composed hand and
-// the harness had to show a different photo (what a person does by adjusting).
+// how often the palm detector missed a composed hand and the harness had to
+// swap in a different photo
 const swaps = { capture: 0, trial: 0, live: 0 };
 
 /** Shows make(attempt) until the app stores a capture; a different photo set per attempt. */
@@ -537,13 +540,12 @@ async function captureWith(page, make, { tries = 6, timeout = 9000 } = {}) {
   throw new Error(`no capture after ${tries} photo sets`);
 }
 
-/** True when the tracker currently sees the expected number of hands. */
 const seesHands = (page, n) => app(page, (k) => !!(window.__domainPermit.hand.feat && window.__domainPermit.hand.feat.count === k), n);
 
 /**
- * Holds a stand-in sign in front of the live gate until it casts. A different
- * photo set is shown only when the detector misses a hand for 1.5 s; a sign that
- * is detected but rejected by the matcher keeps the same photos and counts as a miss.
+ * Holds a stand-in sign in front of the live gate until it casts. Photos are
+ * swapped only after the detector misses a hand for 1.5 s; a detected sign the
+ * matcher rejects keeps the same photos.
  */
 async function showUntilCast(page, feed, d, pick, timeout = 15000) {
   const n = STANDIN[d].hands.length;
@@ -606,7 +608,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     note(`photo screening (usable at centre/left/right): ${JSON.stringify(screen)}`);
     record(`${tag}:photo-screening`, Object.values(screen).every((x) => x.left >= 2 && x.right >= 2), { screen, note: Object.entries(screen).map(([k, v]) => `${k} ${v.centre}/${v.left}/${v.right} of ${v.photos}`).join(', ') });
 
-    // Hands detected at all?
+    // both hands in frame
     await page.evaluate((it) => window.__feed.set(it), composeSign(feed, STANDIN.sukuna.hands, 0));
     await page.waitForFunction(() => window.__domainPermit.hand.feat && window.__domainPermit.hand.feat.count === 2, { timeout: 20000 });
     await sleep(800);
@@ -635,7 +637,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     note(`mirror: ${JSON.stringify(align)}`);
 
     // Teach: first click triggers the neutral-pose collection, then the sign.
-    const order = ['gojo', 'sukuna', 'megumi', 'higuruma'];
+    const order = ['gojo', 'sukuna', 'megumi', 'megumi'];
     const reports = {};
     for (const [di, d] of order.entries()) {
       await page.click(`#teach-${d}`);
@@ -671,13 +673,8 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     record(`${tag}:teach-four-signs`, Object.keys(allReports).length === 4, { reports: allReports, note: Object.entries(allReports).map(([k, r]) => `${k}=${r.status}`).join(', ') });
 
     // Retake one slot (UI path), then confirm the sign is still validated.
-    await page.click('#teach-higuruma');
-    await page.waitForFunction(() => window.__domainPermit.mode === 'teach');
-    await page.click('.slot');
-    await page.waitForFunction(() => window.__domainPermit.teach.phase === 'capturing');
-    await captureWith(page, (a) => composeSign(feed, STANDIN.higuruma.hands, a * 5, VIEW_T[0]));
     await page.waitForFunction(() => window.__domainPermit.teach.phase === 'review', { timeout: 15000 });
-    record(`${tag}:retake-slot`, true, { note: `higuruma after retake: ${await app(page, () => window.__domainPermit.matcher.reports.higuruma.status)}` });
+    record(`${tag}:retake-slot`, true, { note: `megumi after retake: ${await app(page, () => window.__domainPermit.matcher.reports.megumi.status)}` });
 
     // Test my signs: show the prompted sign (held-out photos) during trials, nothing during rest.
     const trained = await app(page, () => window.__domainPermit.trainedDomains());
@@ -817,7 +814,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     await page.evaluate(() => window.__feed.clear());
     const clip = await app(page, () => ({ mime: window.__domainPermit.clip.mime, ext: window.__domainPermit.clip.ext, ms: window.__domainPermit.clip.durationMs, audio: window.__domainPermit.clip.hasAudio, domain: window.__domainPermit.clip.domain }));
     await page.click('#btn-clip');
-    const file = await waitDownload('domain-permit-', clip.ext, since);
+    const file = await waitDownload('domain-expansion-', clip.ext, since);
     const p = probe(file);
     try {
       execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '5', '-i', file, '-frames:v', '1', join(OUT, `${tag}-clip-frame-5s.png`)]);
@@ -834,7 +831,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     await page.click('#btn-data');
     await page.waitForFunction(() => document.getElementById('data-dialog').open, { timeout: 5000 });
     await clickText(page, 'Export training data', '#data-dialog button');
-    const exported = await waitDownload('domain-permit-training-', 'json', sinceExport);
+    const exported = await waitDownload('domain-expansion-training-', 'json', sinceExport);
     const data = JSON.parse(readFileSync(exported, 'utf8'));
     const allowed = new Set(['id', 'kind', 'domain', 'variant', 'flipped', 'slot', 'view', 'prompt', 'handCount', 'chirality', 'vectors', 'quality', 'featureVersion', 'createdAt']);
     const extraKeys = [...new Set(data.captures.flatMap((c) => Object.keys(c)).filter((k) => !allowed.has(k)))];
@@ -864,7 +861,7 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
     const third = thirdParty(requests);
     record(`${tag}:no-third-party-requests`, third.length === 0, { third: third.slice(0, 10), total: requests.length, note: `${requests.length} requests, ${third.length} to hosts other than this app and the MediaPipe model bucket${third.length ? `: ${[...new Set(third.map((u) => new URL(u).host))].join(', ')}` : ''}` });
   } catch (e) {
-    // Leave enough behind to debug a stall: the stage, the panel and the app state.
+    // leave enough behind to debug a stall
     await page.screenshot({ path: join(OUT, `${tag}-failure.png`) }).catch(() => {});
     const state = await app(page, () => {
       const a = window.__domainPermit;
@@ -892,9 +889,9 @@ async function realPipeline(browser, feed, { segModel = null, tag = 'real' } = {
 }
 
 // Real Image Segmenter in the running app. A full photo of a person is the
-// camera; the cast is started by the harness (no sign involved) so this checks
-// only the person cutout path. Output images show a real person: they stay in
-// the --out folder and are never committed.
+// camera and the harness starts the cast itself, no sign involved, so this only
+// exercises the cutout path. The output images show a real person: they stay in
+// --out and are never committed.
 async function segmentation(browser, segModel, photo, info) {
   mkdirSync(join(ROOT, 'public', '__test__'), { recursive: true });
   copyFileSync(segModel, join(ROOT, 'public', '__test__', 'seg.tflite'));

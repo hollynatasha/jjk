@@ -1,5 +1,5 @@
-// Seeded randomness. Every procedural particle in a cast is drawn from a
-// generator seeded by the cast record, so Replay reproduces the same cast.
+// Seeded randomness. Particles in a cast come from a generator seeded by the
+// cast record, so Replay reproduces the same cast.
 
 export function hashString(str) {
   // FNV-1a 32-bit

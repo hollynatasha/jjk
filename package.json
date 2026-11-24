@@ -2,7 +2,7 @@
   "name": "holly-rd-domain-permit",
   "version": "1.0.0",
   "private": true,
-  "description": "Domain Permit: Holly's R&D Department. An unofficial, fan-made webcam hand-sign ritual built on MediaPipe hand landmarks and a locally trained pose matcher.",
+  "description": "Domain Permit: Holly's R&D Department, by @hollynst. A webcam hand-sign ritual built on MediaPipe hand landmarks and a locally trained pose matcher.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -17,6 +17,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "eval:matcher": "node scripts/eval-matcher.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
     "fetch-models": "node scripts/fetch-models.mjs",
     "vectors": "node tests/fixtures/write-sample-vectors.mjs"
@@ -27,7 +28,9 @@
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/ibm-plex-sans": "5.3.0",
     "@fontsource/instrument-serif": "5.3.0",
-    "@mediapipe/tasks-vision": "0.10.35"
+    "@fontsource/schibsted-grotesk": "^5.3.0",
+    "@mediapipe/tasks-vision": "0.10.35",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "fake-indexeddb": "6.2.5",

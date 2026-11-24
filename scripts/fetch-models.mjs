@@ -1,6 +1,6 @@
-// Downloads Google's official MediaPipe model files into public/models, so the
-// app (and a build of it) works without reaching Google storage at runtime.
-// Prints size and SHA-256 for each file and records them in public/models/MODELS.json.
+// Pulls Google's MediaPipe model files into public/models so the app, built or
+// not, never has to reach Google storage at runtime. Size and SHA-256 for each
+// file go to stdout and into public/models/MODELS.json.
 //
 //   npm run fetch-models            both models
 //   npm run fetch-models -- hand    only the hand landmarker
@@ -47,7 +47,7 @@ async function main() {
   let failed = 0;
   for (const id of ids) {
     const m = MODELS[id];
-    process.stdout.write(`${m.file} ← ${m.url}\n`);
+    process.stdout.write(`${m.file} <- ${m.url}\n`);
     try {
       const buf = await download(m.url);
       if (!m.looksRight(buf)) throw new Error(`downloaded ${buf.length} bytes that do not look like a ${m.file} (a proxy or captive portal page?)`);

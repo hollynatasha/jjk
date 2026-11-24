@@ -1,10 +1,8 @@
-// Turns a stream of per-frame matcher decisions into casts.
-// A sign must be accepted for ~0.7 s (with at most 150 ms of dropout and at
-// least a handful of positive frames) before it fires. After a cast the gate
-// cools down and re-arms only once the sign has been released (no accepted
-// sign for 350 ms) at some point since the cast began, so one held pose can
-// never fire twice and one noisy frame never fires. Dropping the hands during
-// the animation counts as that release.
+// Per-frame matcher decisions in, casts out.
+// A sign has to stay accepted for ~0.7s (150ms of dropout tolerated, plus a
+// handful of positive frames) before it fires. Then the gate cools down and
+// won't re-arm until the sign is released: 350ms with nothing accepted, so one
+// long hold can't fire twice. Dropping your hands mid-cast counts as release.
 
 export const GATE_DEFAULTS = {
   holdMs: 700,
@@ -47,7 +45,7 @@ export class CastGate {
     this.until = now;
   }
 
-  /** A cast (live, replay or simulated) has started: lock, and start watching for a release. */
+  /** Cast started (live, replay or sim): lock, then watch for the release. */
   beginCast() {
     this.locked = true;
     this.state = 'casting';
@@ -56,7 +54,7 @@ export class CastGate {
     this.releaseSince = null;
   }
 
-  /** Watches for a release while a cast runs or the gate cools down. */
+  /** Release watcher, used while a cast runs or the gate cools down. */
   observe(now, domain) {
     if (this.released) return true;
     if (domain) {
@@ -108,7 +106,7 @@ export class CastGate {
     // holding
     if (domain && domain === this.domain) {
       if (now - this.lastSeen > o.maxDropoutMs) {
-        // The tracker stalled; a hold only counts if it was observed throughout.
+        // tracker stalled: a hold only counts if it was seen the whole way through
         this.start = now;
         this.frames = 0;
       }
@@ -146,4 +144,16 @@ export class CastGate {
     this.until = now + this.opts.cooldownMs;
     this.domain = null;
   }
+}
+
+/**
+ * Whether the person cutout is worth computing right now. Segmentation is the
+ * second most expensive thing in the frame and it fights hand tracking for the
+ * same budget, so it only runs while a sign is held or a domain is open.
+ */
+export function shouldSegment({ casting = false, gate = null, mode = 'live', challenge = null } = {}) {
+  if (casting) return true;
+  if (gate && gate.state === 'holding' && gate.domain) return true;
+  if (mode === 'test' && challenge && challenge.holding) return true;
+  return false;
 }

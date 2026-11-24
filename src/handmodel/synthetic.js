@@ -1,7 +1,7 @@
-// A small procedural hand. It produces the same 21-landmark layout MediaPipe
-// returns, so the matcher can be unit-tested with deterministic fixtures and
-// the pose cards can be drawn from geometry instead of borrowed images.
-// It is plain kinematics (bone lengths + joint angles), not a learned model.
+// A small procedural hand in the same 21-landmark layout MediaPipe returns, so
+// the matcher gets deterministic test fixtures and the pose cards can be drawn
+// from geometry instead of borrowed images. Plain kinematics, bone lengths and
+// joint angles, nothing learned.
 
 import { add, mul, sub, cross, norm, dot, rotateAxis, deg, mean } from '../core/vec.js';
 
@@ -47,7 +47,7 @@ const E_NRM = [0, 0, 1]; // out of the palm (E_LAT x E_UP)
 
 /**
  * Builds a right hand in its local frame (lateral, up, palm-normal) from a
- * pose description. Angles are degrees; flexion bends toward the palm.
+ * pose. Angles in degrees, flexion bends toward the palm.
  */
 export function buildLocalHand(pose) {
   const p = new Array(21);
@@ -91,7 +91,7 @@ export function buildLocalHand(pose) {
 /**
  * Places a hand in camera space. `u` points from wrist toward the fingers,
  * `n` out of the palm. Camera axes follow MediaPipe: x right, y down, z away.
- * A left hand is the mirror image of the right hand construction.
+ * A left hand is just the right-hand construction mirrored.
  */
 export function placeHand(local, { chirality = 'R', wrist, u, n, scale = 1 }) {
   const uu = norm(u);

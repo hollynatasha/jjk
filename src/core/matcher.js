@@ -1,19 +1,26 @@
-// The department's entire "AI": a nearest-neighbour matcher over Holly's own
-// captures. Each taught sign keeps its captured vectors as templates; every
-// other trained sign plus the neutral poses act as negatives. Thresholds are
-// learned per sign from leave-one-capture-out distances.
+// Nearest-neighbour matcher over the captures you teach. No training step: each
+// sign keeps its capture vectors as templates, every other sign plus the neutral
+// poses act as negatives, and the threshold falls out of leave-one-capture-out
+// distances.
 
 import { featureDistance } from './features.js';
 
+// Numbers come from scripts/eval-matcher.mjs (held-out synthetic frames, every
+// capture view, a spread of tracker noise). Thresholds used to be read straight
+// off leave-one-out distances between training captures, which are all shot in
+// one calm sitting: 66% recall at 0.18% false accepts once live frames hit it.
+// Distance is loose now and `margin` decides, because noise pushes a frame away
+// from every template at once and the ordering between them survives. negCap
+// still stops a threshold reaching into where its neighbours live.
 export const MATCH_DEFAULTS = {
   minCaptures: 12,
   minNegatives: 8,
-  margin: 0.12,
-  thrScale: 1.4,
+  margin: 0.18,
+  thrScale: 3.0,
   thrPad: 0.015,
   thrMin: 0.05,
   thrMax: 0.6,
-  negCap: 0.85,
+  negCap: 1.0,
   handednessGateScore: 0.8,
 };
 
@@ -88,8 +95,8 @@ export class PoseMatcher {
   }
 
   /**
-   * Captures that count against this domain: neutral poses plus the positives
-   * of the other signs currently in play, restricted to the same hand count.
+   * What counts against this domain: neutral poses plus the positives of the
+   * other signs in play, same hand count only.
    */
   others(domain, count, activeSet = null) {
     return this.captures
@@ -203,9 +210,8 @@ export class PoseMatcher {
     let totalConfusion = Object.values(report.confusions).reduce((s, x) => s + x, 0);
     let top = Object.entries(report.confusions).sort((a, b) => b[1] - a[1])[0];
     const n = caps.length;
-    // A threshold squeezed by nearby negatives that then rejects several of
-    // the sign's own captures is the same problem as an outright confusion:
-    // name the neighbour that squeezed it.
+    // A threshold squeezed by nearby negatives that then rejects the sign's own
+    // captures is the same failure as a confusion, so name the neighbour.
     if (totalConfusion < 2 && report.negCapped && report.misses.length >= 3) {
       const squeezed = {};
       for (const pc of perCapture) if (report.misses.includes(pc.id) && pc.negLabel) squeezed[pc.negLabel] = (squeezed[pc.negLabel] || 0) + 1;
@@ -227,7 +233,7 @@ export class PoseMatcher {
       report.status = 'confusable';
       report.confusedWith = top[0];
       const advice = top[0] === NEUTRAL ? 'exaggerate the sign or retrain' : count === 2 ? 'separate wrists or retrain' : 'change the finger shape or retrain';
-      report.message = `${this.name(domain)} resembles ${this.name(top[0])} in ${top[1]}/${n} tries—${advice}.`;
+      report.message = `${this.name(domain)} resembles ${this.name(top[0])} in ${top[1]}/${n} tries; ${advice}.`;
     } else if (report.misses.length >= 3) {
       report.status = 'inconsistent';
       report.message = `${report.misses.length}/${n} captures don't match the rest. Retake the flagged ones.`;
@@ -239,9 +245,9 @@ export class PoseMatcher {
   }
 
   /**
-   * Validates every sign. When two signs collide, the one taught most recently
-   * is held back (reported, never live) and the others are re-validated
-   * without it, so a bad new capture set can't silently break a working sign.
+   * When two signs collide, the one taught most recently is held back
+   * (reported, never live) and the rest re-validated without it, so a bad new
+   * capture set can't silently break a sign that already worked.
    */
   validateAll() {
     const reports = {};
@@ -279,9 +285,9 @@ export class PoseMatcher {
   }
 
   /**
-   * Classify one frame's features. A domain is accepted only if it is inside
-   * its learned threshold, clearly closer than every alternative (other signs
-   * and neutral poses), and passes the hand-count and handedness gates.
+   * Accepts a domain only if the frame is inside its threshold, clearly closer
+   * to it than to any other sign or neutral pose, and gets past the hand-count
+   * and handedness gates.
    */
   classify(feat) {
     const o = this.opts;

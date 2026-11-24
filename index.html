@@ -3,82 +3,86 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <!-- Network policy: the page may only talk to its own origin and to Google's
-         MediaPipe model bucket (hand and segmentation model files). No analytics,
-         no uploads, no other hosts. 'wasm-unsafe-eval' lets the tracker compile its WebAssembly. -->
+    <!-- Own origin plus Google's MediaPipe model bucket (hand + segmentation
+         model files), nothing else. 'wasm-unsafe-eval' is there so the tracker
+         can compile its WebAssembly. -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob: mediastream:; connect-src 'self' https://storage.googleapis.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'" />
-    <title>Domain Permit · Holly's R&amp;D Department</title>
-    <meta name="description" content="An unofficial, fan-made webcam ritual: teach four hand signs, then cast four procedural domains. Runs entirely in your browser." />
-    <meta name="theme-color" content="#000000" />
+    <title>Domain Expansion</title>
+    <meta name="description" content="Teach your webcam three hand signs. Hold one, and that domain opens around you — drawn live, in your browser, on your own camera." />
+    <meta name="theme-color" content="#08080a" />
     <meta name="color-scheme" content="dark" />
     <style>
-      /* Shown only if the app never starts, e.g. index.html opened from disk. */
-      html { background: #000; color: #efe9d6; }
+      /* only shows up if the app never starts, e.g. index.html opened from disk */
+      html { background: #08080a; color: #f2eee6; }
       .boot-late { opacity: 0; animation: boot-late 0.3s ease 5s forwards; }
       @keyframes boot-late { to { opacity: 1; } }
     </style>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Crect x='4' y='7' width='24' height='18' fill='none' stroke='%23c6ff3a' stroke-width='2.4'/%3E%3Cpath d='M9 16h14M9 20h9' stroke='%23efe9d6' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2308080a'/%3E%3Ccircle cx='16' cy='16' r='11' fill='%23ff74ac'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2308080a'/%3E%3C/svg%3E" />
   </head>
-  <body>
+  <body data-mode="landing">
     <a class="skip-link" href="#panel">Skip to controls</a>
     <div id="sr-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
     <header class="desk-header">
-      <div class="brand">
-        <svg class="brand-stamp" viewBox="0 0 120 64" aria-hidden="true">
-          <rect x="3" y="3" width="114" height="58" rx="3" fill="none" stroke="currentColor" stroke-width="2.5" />
-          <rect x="8" y="8" width="104" height="48" rx="2" fill="none" stroke="currentColor" stroke-width="1" />
-          <text x="60" y="25" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" font-weight="700" fill="currentColor" letter-spacing="1.5">DOMAIN PERMIT</text>
-          <text x="60" y="45" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="16" font-weight="700" fill="currentColor" letter-spacing="2">HRD·01</text>
-        </svg>
-        <div class="brand-text">
-          <p class="brand-title">Domain Permit</p>
-          <p class="brand-sub">Holly's R&amp;D Department · headcount 1 · unofficial fan-made</p>
-        </div>
-      </div>
+      <a class="brand" href="#top">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span class="brand-title">Domain Expansion</span>
+      </a>
       <nav class="desk-tools" aria-label="Settings">
         <button type="button" class="tool" id="btn-mute" aria-pressed="false"></button>
         <button type="button" class="tool" id="btn-effects"></button>
         <button type="button" class="tool" id="btn-motion"></button>
+        <button type="button" class="tool" id="btn-aspect" aria-pressed="false"></button>
+        <button type="button" class="tool" id="btn-full" aria-pressed="false"></button>
         <button type="button" class="tool" id="btn-data" aria-haspopup="dialog"></button>
       </nav>
     </header>
 
     <main class="desk" id="desk">
-      <section class="stage-col" aria-label="Stage">
+      <!-- the motif at its largest -->
+      <div class="barrier" aria-hidden="true"><span class="barrier-ring"></span></div>
+
+      <section class="stage-col" aria-label="Stage" id="top">
+        <p class="stage-label"><span class="jp" lang="ja">領域展開</span><span>Domain expansion</span><span class="stage-label-spec" id="stage-spec">9:16</span></p>
         <div class="stage-frame">
           <div class="stage" id="stage">
             <canvas id="stage-canvas" width="720" height="1280" role="img" aria-label="Stage: live camera with hand tracking and domain effects"></canvas>
             <div class="stage-ui" id="stage-ui"></div>
           </div>
-          <span class="crop-mark tl" aria-hidden="true"></span>
-          <span class="crop-mark tr" aria-hidden="true"></span>
-          <span class="crop-mark bl" aria-hidden="true"></span>
-          <span class="crop-mark br" aria-hidden="true"></span>
         </div>
-        <p class="stage-status" id="stage-status">Stage 9:16. This frame is exactly what Save image and Record export.</p>
+        <p class="stage-status" id="stage-status">This frame is exactly what Save image and Record export.</p>
       </section>
+
+      <figure class="hero-pic">
+        <!-- A real frame out of this app, through the same Save image path a
+             visitor gets. Stills and not a clip because canvas capture tears
+             under load and a canvas export never does. -->
+        <img src="/stills/gojo-3p2.jpg" width="1600" height="900" fetchpriority="high"
+             alt="Unlimited Void opening around a stand-in figure: red and violet arcs rushing outward through a field of white motes." />
+      </figure>
 
       <section class="panel" id="panel" aria-label="Controls" tabindex="-1">
         <div class="panel-inner" id="boot-note">
-          <p>Starting the department…</p>
-          <noscript><p>Domain Permit needs JavaScript.</p></noscript>
-          <p class="boot-late">Still here? The app did not start. It has to be served, not opened from disk: run <code>npm run dev</code> and open http://localhost:5173, or put the built <code>dist/</code> folder on an HTTPS host.</p>
+          <p>Opening…</p>
+          <noscript><p>Domain Expansion needs JavaScript.</p></noscript>
+          <p class="boot-late">Still here? The app did not start. It has to be served, not opened from disk: run <code>npm run dev</code> and open the address it prints, or put the built <code>dist/</code> folder on an HTTPS host.</p>
         </div>
       </section>
 
       <section class="library" id="library" aria-labelledby="library-title">
         <div class="library-head">
           <h2 id="library-title">Gesture library</h2>
-          <p class="library-sub">Four signs. Study the cards first, teach one or all four, unlock the rest later.</p>
+          <span class="jp-rail" lang="ja" aria-hidden="true">呪印</span>
+          <p class="library-sub">Study a card, then teach it.</p>
         </div>
         <div class="cards" id="cards"></div>
       </section>
+
     </main>
 
     <footer class="desk-footer">
       <p>
-        Unofficial fan-made project, not affiliated with or endorsed by Gege Akutami, Shueisha, MAPPA or TOHO. Visual inspiration: @reinesana.ai. Hand tracking: Google MediaPipe. All art and sound here are procedural and original.
+        Made by @hollynst. Not affiliated with or endorsed by Gege Akutami, Shueisha, MAPPA or TOHO. Visual inspiration: @reinesana.ai. Hand tracking: Google MediaPipe. All art and sound here are procedural and original.
       </p>
       <p>Camera frames stay in this tab. The only thing saved is numeric hand-shape data you teach, which you can export or delete.</p>
     </footer>

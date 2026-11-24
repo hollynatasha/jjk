@@ -1,4 +1,4 @@
-// Small persisted preferences (mute, effects level, motion, card flips).
+// Small persisted preferences.
 const KEY = 'hrd-settings-v1';
 
 export const DEFAULT_SETTINGS = {
@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS = {
   effects: 'high',
   motion: 'auto', // 'auto' follows prefers-reduced-motion, or 'reduced' / 'full'
   cameraQuality: '480p',
+  aspect: 'landscape', // stage shape: 'landscape' is 16:9, 'portrait' is 9:16
   flipped: {},
   variant: {},
   customHands: {},

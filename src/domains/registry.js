@@ -1,14 +1,12 @@
-// Domain id -> animation module. Four entries, one per taught sign.
+// domain id -> animation module
 import unlimitedVoid from './unlimited-void.js';
 import malevolentShrine from './malevolent-shrine.js';
 import chimeraShadowGarden from './chimera-shadow-garden.js';
-import deadlySentencing from './deadly-sentencing.js';
 
 export const DOMAIN_MODULES = {
   gojo: unlimitedVoid,
   sukuna: malevolentShrine,
   megumi: chimeraShadowGarden,
-  higuruma: deadlySentencing,
 };
 
 export function moduleFor(domainId) {

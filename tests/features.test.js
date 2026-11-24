@@ -47,7 +47,7 @@ describe('feature extraction', () => {
   });
 
   it('does not depend on the tracker output order of two hands', () => {
-    const frame = frameFor(SIGN_SCENES.higuruma.friendly, 5, { rng: null, noiseRng: null });
+    const frame = frameFor(SIGN_SCENES.megumi.friendly, 5, { rng: null, noiseRng: null });
     const swapped = { ...frame, hands: frame.hands.slice().reverse() };
     const a = extractFrameFeatures(frame);
     const b = extractFrameFeatures(swapped);

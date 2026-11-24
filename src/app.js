@@ -7,9 +7,10 @@ import { AudioDesk } from './media/audio.js';
 import { ClipRecorder, downloadBlob, stampForFilename } from './media/recorder.js';
 import { Tracker } from './media/tracker.js';
 import { PersonMask } from './media/segmentation.js';
+import { ClipLibrary } from './media/clips.js';
 import { cameraSupport, describeCameraError, listCameras, openCamera, stopStream } from './media/camera.js';
 import { PoseMatcher } from './core/matcher.js';
-import { CastGate } from './core/gate.js';
+import { CastGate, shouldSegment } from './core/gate.js';
 import { StableCapture } from './core/capture.js';
 import { SignChallenge } from './core/challenge.js';
 import { extractFrameFeatures, FEATURE_VERSION } from './core/features.js';
@@ -34,8 +35,24 @@ const HAND_FPS = (() => {
   return Number.isFinite(v) && v >= 5 && v <= 20 ? v : 18;
 })();
 const HAND_INTERVAL = 1000 / HAND_FPS;
-// Segmentation only gets the frames hand tracking leaves free. If it cannot get
-// at least this many masks per window, the app switches to effects overlay mode.
+// The gate is locked while a domain is open, so nothing needs a fast hand read.
+// Anchors are interpolated, so the domain still follows the hands at 10 fps.
+const HAND_INTERVAL_CAST = 1000 / 10;
+// The frame a domain opens on is the most expensive one: the clip starts
+// decoding, the audio graph spins up and the first world frame draws. Measured
+// mid-cast, one mask costs 10-26 ms against a 16 ms frame budget, and
+// segmentation landed on five of the eight worst frames of a cast. The mask
+// taken while the sign was held is still fresh through the rupture, so tracking
+// sits out instead of adding 15 ms here.
+const CAST_OPEN_QUIET_MS = 600;
+// Mask cadence. Someone holding a sign barely moves, so a cast can afford a
+// slower mask. Has to stay inside PersonMask's 1500 ms freshness or the cutout
+// drops out mid-rupture and the domain falls back to its portal.
+const SEG_INTERVAL = 120;
+const SEG_INTERVAL_CAST = 380;
+const SEG_INTERVAL_LOW = 260;
+// Segmentation only gets the frames hand tracking leaves free. Fewer than
+// SEG_MIN_FRAMES masks per window and the app switches to effects overlay mode.
 const SEG_WATCH_MS = 4000;
 const SEG_MIN_FRAMES = 3;
 
@@ -44,6 +61,7 @@ export class App {
     this.dom = {
       canvas: document.getElementById('stage-canvas'),
       stage: document.getElementById('stage'),
+      stageCol: document.querySelector('.stage-col'),
       stageUi: document.getElementById('stage-ui'),
       status: document.getElementById('stage-status'),
       panel: document.getElementById('panel'),
@@ -52,12 +70,14 @@ export class App {
     };
     this.settings = loadSettings();
     this.reducedQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false, addEventListener() {} };
+    this.applyAspect(this.settings.aspect);
     this.stage = new Stage(this.dom.canvas);
     this.audio = new AudioDesk();
     this.audio.muted = this.settings.muted;
     this.recorder = new ClipRecorder(this.dom.canvas, this.audio);
     this.tracker = new Tracker();
     this.mask = new PersonMask();
+    this.clips = new ClipLibrary();
     this.matcher = new PoseMatcher();
     this.gate = new CastGate();
     this.mode = 'landing';
@@ -69,6 +89,9 @@ export class App {
     this.models = { runtime: 'idle', hand: 'idle', seg: 'idle', handProgress: 0, segProgress: 0, handSrc: '', segSrc: '', segNote: '' };
     this.segEnabled = false;
     this.segLastAt = 0;
+    // a few masks run once the model loads, so the first held sign is not a cold start
+    this.segWarmup = 0;
+    this.castOpenedAt = -Infinity;
     this.captures = [];
     this.staleCaptures = 0;
     this.meta = { domains: {} };
@@ -94,8 +117,8 @@ export class App {
     this.flashAt = 0;
     this.expanded = {};
     this.perf = { frameMs: 0, byDomain: {} };
-    // Test hook: with ?debug=1 the cast clock can be frozen at an exact time
-    // so automated screenshots are deterministic. Inert otherwise.
+    // with ?debug=1 the cast clock can be frozen at an exact time, so the
+    // screenshot tests are deterministic. inert otherwise.
     this.debug = new URLSearchParams(location.search).get('debug') === '1';
     this.clockOverride = null;
     window.__domainPermit = this; // read-only debugging handle for the e2e harness
@@ -134,6 +157,10 @@ export class App {
       this.notice(`Training storage unavailable (${e.message}). Captures will last until you close the tab.`);
     }
     this.refreshMatcher();
+    for (const d of DOMAINS) this.clips.prepare(d.animationId);
+    this.prewarm = setInterval(() => {
+      if (this.stage.prewarmParticles(this.low)) clearInterval(this.prewarm);
+    }, 900);
     this.raf = requestAnimationFrame(this.loop);
   }
 
@@ -158,6 +185,12 @@ export class App {
     } else if (k === 'e') {
       this.toggleEffects();
       e.preventDefault();
+    } else if (k === 'f') {
+      this.toggleFullscreen();
+      e.preventDefault();
+    } else if (k === 'a') {
+      this.toggleAspect();
+      e.preventDefault();
     } else if (k === 'r' && (this.mode === 'live' || this.mode === 'result' || this.mode === 'sim') && this.rec.phase === 'idle' && !this.run) {
       this.startRecording();
       e.preventDefault();
@@ -171,10 +204,19 @@ export class App {
   }
 
   // ---------- modes ----------
-  setMode(mode, { focus = true } = {}) {
+  /**
+   * `defer` pushes the panel rebuild to the next frame. The rebuild is DOM
+   * construction plus a layout pass, and the frame a domain opens on has
+   * nothing to spare. The mode flips immediately either way, so CSS and the
+   * render loop agree; only the panel catches up late.
+   */
+  setMode(mode, { focus = true, defer = false } = {}) {
     const prev = this.mode;
     this.mode = mode;
-    this.renderAll();
+    // CSS lays the landing page out differently from the working desk
+    document.body.dataset.mode = mode;
+    if (defer) requestAnimationFrame(() => this.renderAll());
+    else this.renderAll();
     if (focus && prev !== mode) {
       const head = this.dom.panel.querySelector('h1, h2');
       if (head) {
@@ -275,7 +317,7 @@ export class App {
 
   async exportTraining() {
     const json = await exportTraining(this.store);
-    downloadBlob(new Blob([json], { type: 'application/json' }), `domain-permit-training-${stampForFilename()}.json`);
+    downloadBlob(new Blob([json], { type: 'application/json' }), `domain-expansion-training-${stampForFilename()}.json`);
     announce('Training data exported.');
   }
 
@@ -434,6 +476,7 @@ export class App {
       this.models.segSrc = this.tracker.segSource.label;
       this.segEnabled = true;
       this.segWatch = null;
+      this.segWarmup = 3;
     } catch (e) {
       this.models.seg = 'failed';
       this.models.segNote = e.message;
@@ -446,6 +489,7 @@ export class App {
   segmentationOff(note, message) {
     this.segEnabled = false;
     this.segWatch = null;
+    this.segWarmup = 0;
     this.models.seg = 'slow';
     this.models.segNote = note;
     this.mask.reset();
@@ -486,7 +530,7 @@ export class App {
         this.perf.byDomain[id] = this.perf.byDomain[id] ? this.perf.byDomain[id] * 0.9 + dt * 0.1 : dt;
       }
     } catch (e) {
-      // Keep the loop alive; surface the problem once.
+      // keep the loop alive, surface the problem once
       if (!this.loopError) {
         this.loopError = e;
         console.error(e);
@@ -506,31 +550,48 @@ export class App {
     this.lastTickAt = rt;
     if (camReady) {
       this.view = computeView(this.video.videoWidth, this.video.videoHeight, this.dom.canvas.width, this.dom.canvas.height, this.cam.mirror);
-      if (this.tracker.hand && rt - this.hand.lastAt >= HAND_INTERVAL) {
+      const opening = this.run && rt - this.castOpenedAt < CAST_OPEN_QUIET_MS;
+      const handEvery = this.run ? HAND_INTERVAL_CAST : HAND_INTERVAL;
+      if (!opening && this.tracker.hand && rt - this.hand.lastAt >= handEvery) {
         const frame = this.tracker.detectHands(this.video, rt);
         if (frame) {
           this.hand.lastAt = rt;
           this.onFrame(frame, rt);
         }
-      } else if (this.segEnabled && this.tracker.seg && rt - this.segLastAt >= (this.low ? 260 : 120) && rt - this.hand.lastAt > 10) {
+      } else if (
+        !opening &&
+        this.segEnabled &&
+        this.tracker.seg &&
+        (this.segmentNow || this.segWarmup > 0) &&
+        rt - this.segLastAt >= (this.low ? SEG_INTERVAL_LOW : this.run ? SEG_INTERVAL_CAST : SEG_INTERVAL) &&
+        // Keep the mask off the frame a hand read just used: together they run
+        // longer than one frame, so it defers by a frame instead. Measured,
+        // since the cost differs wildly by device.
+        rt - this.hand.lastAt > Math.max(12, this.tracker.stats.handMs || 0)
+      ) {
         this.segLastAt = rt;
+        if (!this.segmentNow && this.segWarmup > 0) this.segWarmup--;
         this.tracker.segment(this.video, rt, (data, w, h) => this.mask.update(data, w, h, rt));
         const st = this.tracker.stats;
         if (st.segFrames > 20 && st.segMs > 80) {
           this.segmentationOff(`segmentation averaged ${Math.round(st.segMs)} ms per frame`, 'Effects overlay mode: segmentation is too slow on this device, so it was switched off to keep hand tracking smooth.');
         }
       }
-      if (this.segEnabled && this.tracker.seg) {
-        // Hand tracking always comes first. When it needs every frame (slow CPU),
-        // segmentation starves; say so and use overlay mode instead of a stale cutout.
+      if (this.segEnabled && this.tracker.seg && this.segmentNow) {
+        // Hand tracking always wins the frame, so on a slow CPU segmentation
+        // starves; better to say so than show a stale cutout. Only measured
+        // while a sign or cast is asking for masks, since idle frames produce
+        // none by design and would read as starvation.
         const w = this.segWatch || (this.segWatch = { since: rt, frames: this.tracker.stats.segFrames });
         if (rt - w.since >= SEG_WATCH_MS) {
           const got = this.tracker.stats.segFrames - w.frames;
           this.segWatch = null;
           if (got < SEG_MIN_FRAMES) {
-            this.segmentationOff(`hand tracking (${Math.round(this.tracker.stats.handMs)} ms per frame) left no time for segmentation`, 'Effects overlay mode: hand tracking needs all of this device’s time, so the person cutout is off. Hand signs work as normal.');
+            this.segmentationOff(`hand tracking (${Math.round(this.tracker.stats.handMs)} ms per frame) left no time for segmentation`, 'Effects overlay mode: hand tracking is using every millisecond this device has, so the person cutout is off. Hand signs work as normal.');
           }
         }
+      } else {
+        this.segWatch = null;
       }
       if (rt - this.lightAt > 1000) {
         this.lightAt = rt;
@@ -562,6 +623,15 @@ export class App {
     }
   }
 
+  /**
+   * Whether to cut the person out this frame; the rule lives in core/gate.js.
+   * The 700 ms hold before a cast fires doubles as the mask warm-up, so the
+   * cutout is ready by the time the domain opens.
+   */
+  get segmentNow() {
+    return shouldSegment({ casting: !!this.run, gate: this.hand.gate, mode: this.mode, challenge: this.challengeSnap });
+  }
+
   stageState(now) {
     const sim = this.mode === 'sim' || !!(this.run && this.run.record.simulated);
     const preview = !sim && !this.cameraOn && !this.run;
@@ -583,12 +653,14 @@ export class App {
       charge,
       cast: this.run,
       castKey: this.castKey,
+      clips: this.clips,
+      clip: this.run ? this.clips.get(this.run.module.id) : null,
       low: this.low,
       reduced: this.reduced,
     };
   }
 
-  /** Smoothed stage-space hands for drawing; alpha fades traces in only when tracking is confident. */
+  /** Smoothed stage-space hands for drawing. Alpha fades traces in only above 0.85 score. */
   updateCanvasHands(frame) {
     const next = handsToCanvas(frame, this.view).sort((a, b) => a.pts[0][0] - b.pts[0][0]);
     const prev = this.hand.canvas;
@@ -644,8 +716,14 @@ export class App {
 
   // ---------- teach ----------
   openTeach(domain, { after = null } = {}) {
+    // Teaching needs the tracker, so start the camera here rather than leave a
+    // notice on a stage that may be scrolled out of view.
     if (!this.cameraOn) {
-      this.notice('Start the camera to teach a sign. Simulation can only preview effects.');
+      if (this.cam.status === 'starting') return;
+      this.notice('Starting the camera first: teaching needs the hand tracker.');
+      this.startCamera().then(() => {
+        if (this.cameraOn) this.openTeach(domain, { after });
+      });
       return;
     }
     const d = domainById(domain);
@@ -899,6 +977,7 @@ export class App {
     if (this.run) return;
     this.audio.unlock();
     const mod = moduleFor(domainId);
+    this.clips.start(mod.id);
     const live = anchorsFromHands(this.hand.canvas);
     const record = replay
       ? { ...replay, replayOf: replay.id }
@@ -915,11 +994,12 @@ export class App {
         };
     this.run = new CastRun(record, mod, { W: this.dom.canvas.width, H: this.dom.canvas.height });
     this.run.begin(now);
+    this.castOpenedAt = performance.now();
     this.castKey = `${record.id}-${Math.round(now)}`;
     this.gate.beginCast();
     this.audio.play(domainId, this.run.state, { reduced: !!record.reduced });
     this.lastCastDomain = domainId;
-    this.setMode('cast', { focus: false });
+    this.setMode('cast', { focus: false, defer: true });
     const d = domainById(domainId);
     announce(`${d.title.toLowerCase()} opening${simulated ? ' (simulation)' : ''}.`);
   }
@@ -929,6 +1009,7 @@ export class App {
     const simulated = !!run.record.simulated;
     if (!run.replay) this.lastRecord = run.snapshot();
     this.run = null;
+    this.clips.stop();
     this.gate.castFinished(now);
     if (this.rec.phase === 'recording') this.rec.stopAt = now + 1000;
     this.setMode(simulated ? 'sim' : 'result', { focus: false });
@@ -937,6 +1018,7 @@ export class App {
   abortCast() {
     if (!this.run) return;
     this.run = null;
+    this.clips.stop();
     this.audio.stopAll();
     this.gate.reset();
   }
@@ -968,7 +1050,7 @@ export class App {
         this.notice('This browser could not encode the PNG.');
         return;
       }
-      downloadBlob(blob, `domain-permit-${name}-${stampForFilename()}.png`);
+      downloadBlob(blob, `domain-expansion-${name}-${stampForFilename()}.png`);
       announce(`Saved ${src.width} by ${src.height} PNG.`);
     }, 'image/png');
   }
@@ -1045,7 +1127,7 @@ export class App {
 
   saveClip() {
     if (!this.clip) return;
-    downloadBlob(this.clip.blob, `domain-permit-${this.clip.domain}-${stampForFilename()}.${this.clip.ext}`);
+    downloadBlob(this.clip.blob, `domain-expansion-${this.clip.domain}-${stampForFilename()}.${this.clip.ext}`);
     announce(`Saved ${this.clip.ext.toUpperCase()} clip.`);
   }
 
@@ -1063,6 +1145,59 @@ export class App {
     this.saveSettings();
     renderHeader(this);
     announce(`Effects ${this.settings.effects}.`);
+  }
+
+  /**
+   * Sizes the export canvas: 720x1280 for a phone frame, 1280x720 for a laptop.
+   * Camera mapping, domains, PNG and clip all read their size off this canvas,
+   * so this is the only place the two shapes differ.
+   */
+  applyAspect(aspect) {
+    const landscape = aspect === 'landscape';
+    const w = landscape ? 1280 : 720;
+    const h = landscape ? 720 : 1280;
+    const c = this.dom.canvas;
+    if (c.width === w && c.height === h) return false;
+    c.width = w;
+    c.height = h;
+    document.documentElement.style.setProperty('--stage-ar', landscape ? '16 / 9' : '9 / 16');
+    document.documentElement.style.setProperty('--stage-wh', landscape ? '1.7778' : '0.5625');
+    document.body.dataset.aspect = landscape ? 'landscape' : 'portrait';
+    const spec = document.getElementById('stage-spec');
+    if (spec) spec.textContent = landscape ? '16:9' : '9:16';
+    return true;
+  }
+
+  /** Never mid-cast and never mid-recording: the canvas resize would wreck both. */
+  toggleAspect() {
+    if (this.run || this.rec.phase !== 'idle') return;
+    this.settings.aspect = this.settings.aspect === 'landscape' ? 'portrait' : 'landscape';
+    this.saveSettings();
+    if (this.applyAspect(this.settings.aspect)) {
+      // the stage caches its size and its scratch canvases, so rebuild it
+      this.stage = new Stage(this.dom.canvas);
+      this.peak.width = this.dom.canvas.width;
+      this.peak.height = this.dom.canvas.height;
+      this.peakDomain = null;
+      if (this.video && this.video.videoWidth) {
+        this.view = computeView(this.video.videoWidth, this.video.videoHeight, this.dom.canvas.width, this.dom.canvas.height, this.cam.mirror);
+      }
+      this.mask.reset();
+    }
+    renderHeader(this);
+    this.renderAll();
+    announce(`Stage ${this.settings.aspect === 'landscape' ? '16 by 9, landscape' : '9 by 16, portrait'}.`);
+  }
+
+  async toggleFullscreen() {
+    const el = this.dom.stageCol || this.dom.canvas.closest('.stage-col');
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (el && el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' });
+    } catch (e) {
+      this.notice(`Fullscreen was refused: ${e.message}`);
+    }
+    renderHeader(this);
   }
 
   cycleMotion() {
@@ -1111,6 +1246,8 @@ export class App {
 
   shutdown() {
     cancelAnimationFrame(this.raf);
+    clearInterval(this.prewarm);
+    this.clips.stop();
     this.cancelRecording();
     stopStream(this.cam.stream);
     this.tracker.close();

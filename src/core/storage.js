@@ -1,6 +1,6 @@
-// Training storage. Only labelled numeric feature vectors and small metadata
-// are kept: never a camera frame, image or video. IndexedDB first, with a
-// localStorage fallback for browsers that block it (some private modes).
+// Training storage. Only labelled numeric feature vectors and small metadata,
+// never a camera frame or image. IndexedDB first, localStorage fallback for
+// browsers that block it (some private modes).
 
 import { FEATURE_VERSION } from './features.js';
 
@@ -179,7 +179,7 @@ export async function openTrainingStore({ indexedDB = globalThis.indexedDB, stor
   return new LocalStore(ls);
 }
 
-/** Loads captures, split into usable ones and ones from an older feature version. */
+/** Captures split into usable ones and a count of stale (older feature version) ones. */
 export async function loadCaptures(store) {
   const all = await store.listCaptures();
   const usable = all.filter((c) => c.featureVersion === FEATURE_VERSION);
@@ -210,7 +210,7 @@ export async function importTraining(store, text, { replace = false } = {}) {
   } catch {
     throw new Error('That file is not valid JSON.');
   }
-  if (!data || data.format !== EXPORT_FORMAT) throw new Error('That file is not a Domain Permit training export.');
+  if (!data || data.format !== EXPORT_FORMAT) throw new Error('That file is not a Domain Expansion training export.');
   if (data.featureVersion !== FEATURE_VERSION) throw new Error(`That export uses feature version ${data.featureVersion}; this build expects ${FEATURE_VERSION}. Retake instead.`);
   const caps = Array.isArray(data.captures) ? data.captures : [];
   for (const c of caps) {

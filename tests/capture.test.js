@@ -76,8 +76,8 @@ describe('stable capture', () => {
   });
 
   it('does not store a pose held across a prompt change under the next prompt', () => {
-    // Neutral "fists" (two hands) captured, prompt moves on to a two-hand sign
-    // while the person is still holding the fists.
+    // neutral "fists" captured, then the prompt moves to a two-hand sign while
+    // the fists are still up
     const first = new StableCapture(2);
     const fists = (f) => steady(NEUTRAL_SCENES.fistBoth, 18, f);
     expect(run(first, 0, 1000, fists).some((r) => r.status === 'captured')).toBe(true);
@@ -85,11 +85,11 @@ describe('stable capture', () => {
     const held = run(next, 1000, 2000, fists);
     expect(held.some((r) => r.status === 'captured')).toBe(false);
     expect(held[held.length - 1].status).toBe('need-release');
-    // Hands down, then the real sign: captured normally.
+    // hands down, then the real sign
     run(next, 3000, 400, () => empty);
     const sign = run(next, 3400, 1000, (f) => steady(SIGN_SCENES.sukuna.friendly, 19, f));
     expect(sign.filter((r) => r.status === 'captured')).toHaveLength(1);
-    // Without the hand-off the held pose would have been captured at once.
+    // without the hand-off, the held pose would have been captured at once
     const naive = new StableCapture(2);
     expect(run(naive, 1000, 1000, fists).some((r) => r.status === 'captured')).toBe(true);
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CastGate } from '../src/core/gate.js';
+import { CastGate, shouldSegment } from '../src/core/gate.js';
 
 const STEP = 55; // ~18 fps tracking cadence
 
@@ -51,13 +51,13 @@ describe('cast gate', () => {
 
   it('needs enough positive frames, not just elapsed time', () => {
     const g = new CastGate();
-    g.update(0, 'higuruma');
-    g.update(120, 'higuruma');
-    g.update(240, 'higuruma');
-    g.update(360, 'higuruma');
-    // A stalled tracker (no frames for 440 ms) restarts the hold, so a
-    // sparse stream cannot add up to a cast.
-    const r = g.update(800, 'higuruma');
+    g.update(0, 'megumi');
+    g.update(120, 'megumi');
+    g.update(240, 'megumi');
+    g.update(360, 'megumi');
+    // a stalled tracker (no frames for 440 ms) restarts the hold, so a sparse
+    // stream never adds up to a cast
+    const r = g.update(800, 'megumi');
     expect(r.event).not.toBe('cast');
     expect(r.progress).toBe(0);
   });
@@ -142,5 +142,31 @@ describe('cast gate', () => {
     g.unlock(2000, { requireRelease: true });
     const still = feed(g, 2000, 1500, 'sukuna');
     expect(still.events.some((e) => e.event === 'cast')).toBe(false);
+  });
+});
+
+describe('when the person cutout is worth computing', () => {
+  it('stays off while the camera is just a camera', () => {
+    expect(shouldSegment({})).toBe(false);
+    expect(shouldSegment({ gate: { state: 'idle', domain: null } })).toBe(false);
+    expect(shouldSegment({ gate: { state: 'armed', domain: 'gojo' } })).toBe(false);
+  });
+
+  it('turns on while a sign is being held, so the mask is warm when the domain opens', () => {
+    expect(shouldSegment({ gate: { state: 'holding', domain: 'gojo' } })).toBe(true);
+  });
+
+  it('ignores a hold with no domain behind it', () => {
+    expect(shouldSegment({ gate: { state: 'holding', domain: null } })).toBe(false);
+  });
+
+  it('stays on for the whole cast', () => {
+    expect(shouldSegment({ casting: true })).toBe(true);
+    expect(shouldSegment({ casting: true, gate: { state: 'idle', domain: null } })).toBe(true);
+  });
+
+  it('follows the challenge hold in test mode only', () => {
+    expect(shouldSegment({ mode: 'test', challenge: { holding: 'sukuna' } })).toBe(true);
+    expect(shouldSegment({ mode: 'live', challenge: { holding: 'sukuna' } })).toBe(false);
   });
 });

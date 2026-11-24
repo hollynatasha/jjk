@@ -1,6 +1,6 @@
-// Original Web Audio synthesis, one short soundscape per domain. Nothing is
-// sampled or imported. The AudioContext is created on a user gesture; if it
-// cannot start, the visuals still run. No microphone is ever requested.
+// One short soundscape per domain, synthesised with Web Audio: no samples, no
+// imported audio, no microphone. The AudioContext needs a user gesture, and if
+// it never starts the visuals run anyway.
 
 import { makeRng } from '../core/rng.js';
 
@@ -150,11 +150,26 @@ export class AudioDesk {
   }
 }
 
-// ---------- the four soundscapes ----------
+/**
+ * Held chord plus a slow repeating figure under the effects, so a cast is not
+ * only hits. Runs most of the 7.5 s cast and fades out under the dissolve.
+ */
+function bed(d, t0, { chord, type = 'sine', gain = 0.03, filter = null, motif = [], motifType = 'sine', motifGain = 0.022, every = 1.1, from = 0.6, dur = 6.4 }) {
+  chord.forEach((f, i) => {
+    d.tone({ type, f0: f, t0: t0 + 0.08 + i * 0.1, dur, gain: gain * (i ? 1 : 1.25), attack: 1.2, release: 1.4, detune: (i - 1) * 4, filter });
+  });
+  for (let k = 0; motif.length && from + k * every < dur - 0.8; k++) {
+    d.tone({ type: motifType, f0: motif[k % motif.length], t0: t0 + from + k * every, dur: 0.45, gain: motifGain, attack: 0.07, release: 1.6 });
+  }
+}
+
+// ---------- the soundscapes, one per domain ----------
 
 const SOUNDS = {
-  // Airy rising overtone + a crystalline hit as the ring opens.
+  // airy rising overtone, then a crystalline hit as the ring opens
   gojo(d, t0) {
+    // open fifths and a high figure drifting over them
+    bed(d, t0, { chord: [110, 164.81, 220], gain: 0.026, motif: [880, 1108.73, 1318.51, 1760], motifGain: 0.018, every: 0.95 });
     d.noise({ t0, dur: 1.3, gain: 0.18, attack: 0.5, release: 0.6, type: 'bandpass', f0: 900, f1: 5200, q: 0.8 });
     for (const [f, g] of [[330, 0.05], [495, 0.04], [660, 0.035], [990, 0.025]]) {
       d.tone({ type: 'sine', f0: f, f1: f * 2, glide: 1.2, t0, dur: 1.2, gain: g, attack: 0.4, release: 0.7 });
@@ -167,8 +182,10 @@ const SOUNDS = {
     d.tone({ type: 'sine', f0: 1320, t0: t0 + 1.6, dur: 3.8, gain: 0.012, attack: 1.4, release: 1.2 });
   },
 
-  // Ink-brush swooshes for each slash and a low pulse under it all.
+  // Ink-brush swoosh per slash, low pulse under all of it.
   sukuna(d, t0, state) {
+    // low, flat and ominous under the slashes
+    bed(d, t0, { chord: [55, 82.41, 110], type: 'sawtooth', gain: 0.022, filter: { type: 'lowpass', f: 210, q: 1.2 }, motif: [146.83, 174.61, 130.81], motifType: 'triangle', motifGain: 0.026, every: 1.45 });
     const r = makeRng(77);
     for (let i = 0; i < 10; i++) d.noise({ t0: t0 + r.range(0, 0.35), dur: 0.015, gain: 0.05, attack: 0.002, release: 0.03, type: 'highpass', f0: 2500, q: 0.5 });
     d.noise({ t0: t0 + 0.25, dur: 1.1, gain: 0.12, attack: 0.2, release: 0.6, type: 'lowpass', f0: 220, q: 0.7 });
@@ -183,8 +200,10 @@ const SOUNDS = {
     }
   },
 
-  // Soft liquid drips and a low string texture; a swell for the wave.
+  // drips, a low string texture, and a swell for the wave
   megumi(d, t0, state, { reduced }) {
+    // minor figure riding over the string texture below
+    bed(d, t0, { chord: [392, 466.16], gain: 0.009, motif: [196, 233.08, 293.66, 233.08], motifType: 'triangle', motifGain: 0.024, every: 1.6 });
     for (const dr of (state.drips || []).slice(0, 12)) {
       d.tone({ type: 'sine', f0: 1100, f1: 330, glide: 0.07, t0: t0 + dr.t0 + 0.12, dur: 0.02, gain: 0.07, attack: 0.003, release: 0.12 });
     }
@@ -199,23 +218,6 @@ const SOUNDS = {
     d.noise({ t0: wt, dur: 1.0, gain: 0.14, attack: 0.5, release: 0.6, type: 'lowpass', f0: 300, f1: 1200, q: 0.8 });
   },
 
-  // Paper shuffle, a ticking pendulum and a comically final stamp thump.
-  higuruma(d, t0, state, { reduced }) {
-    d.tone({ type: 'sine', f0: 1800, f1: 2400, glide: 0.25, t0, dur: 0.25, gain: 0.03, attack: 0.02, release: 0.1 });
-    const r = makeRng(5150);
-    for (let i = 0; i < 7; i++) d.noise({ t0: t0 + 0.3 + i * 0.14 + r.range(0, 0.06), dur: r.range(0.04, 0.08), gain: 0.08, attack: 0.005, release: 0.05, type: 'highpass', f0: 1600, q: 0.7 });
-    for (let k = 0; k < 6; k++) {
-      const tk = t0 + 1.3 + k * 0.45;
-      d.tone({ type: 'sine', f0: k % 2 ? 1000 : 1400, t0: tk, dur: 0.012, gain: 0.07, attack: 0.002, release: 0.05 });
-      d.noise({ t0: tk, dur: 0.01, gain: 0.04, attack: 0.001, release: 0.02, type: 'bandpass', f0: 3000, q: 2 });
-    }
-    const impact = t0 + 4.15;
-    d.noise({ t0: impact - (reduced ? 0.75 : 0.4), dur: reduced ? 0.7 : 0.38, gain: 0.07, attack: 0.2, release: 0.05, type: 'bandpass', f0: 400, f1: 1600, q: 0.8 });
-    d.tone({ type: 'sine', f0: 140, f1: 42, glide: 0.25, t0: impact, dur: 0.05, gain: 0.5, attack: 0.004, release: 0.45 });
-    d.noise({ t0: impact, dur: 0.06, gain: 0.22, attack: 0.002, release: 0.12, type: 'lowpass', f0: 900, q: 0.5 });
-    d.tone({ type: 'triangle', f0: 2093, t0: impact + 0.24, dur: 0.01, gain: 0.03, attack: 0.002, release: 0.5 });
-    for (let i = 0; i < 14; i++) d.noise({ t0: t0 + 5.8 + r.range(0, 1.3), dur: 0.03, gain: 0.05, attack: 0.002, release: 0.05, type: 'bandpass', f0: r.range(700, 2200), q: 1.5 });
-  },
 };
 
 export const SOUND_IDS = Object.keys(SOUNDS);

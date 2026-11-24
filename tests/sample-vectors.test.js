@@ -15,7 +15,7 @@ describe('synthetic sample vectors', () => {
 
   it('hold only labels and numbers: no image, video or extra fields', () => {
     expect(file.synthetic).toBe(true);
-    expect(file.captures).toHaveLength(4 * 12 + 8);
+    expect(file.captures).toHaveLength(3 * 12 + 8);
     for (const c of file.captures) {
       for (const k of Object.keys(c)) expect(ALLOWED.has(k)).toBe(true);
       for (const v of c.vectors) expect(v.every((x) => typeof x === 'number' && Number.isFinite(x))).toBe(true);
@@ -26,13 +26,13 @@ describe('synthetic sample vectors', () => {
 
   it('import into the app store, export again, and train every sign without a ready badge', async () => {
     const store = await openTrainingStore({ indexedDB: null, storage: null });
-    expect(await importTraining(store, JSON.stringify(file))).toBe(56);
+    expect(await importTraining(store, JSON.stringify(file))).toBe(44);
     const round = JSON.parse(await exportTraining(store));
-    expect(round.captures).toHaveLength(56);
+    expect(round.captures).toHaveLength(44);
     expect(round.domains).toEqual({});
     const m = new PoseMatcher();
     m.setData(await store.listCaptures(), LABELS);
-    for (const d of ['gojo', 'sukuna', 'megumi', 'higuruma']) expect(m.reports[d].status).toBe('learned');
+    for (const d of ['gojo', 'sukuna', 'megumi']) expect(m.reports[d].status).toBe('learned');
     // a fresh synthetic Megumi frame is recognised as Megumi
     const cls = m.classify(featFor(SIGN_SCENES.megumi.friendly, 4242, { view: 'right' }));
     expect(cls.best).toBe('megumi');

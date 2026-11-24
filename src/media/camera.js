@@ -25,7 +25,7 @@ export async function openCamera({ deviceId = null, facingMode = 'user', quality
   const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
   const track = stream.getVideoTracks()[0];
   const settings = track && track.getSettings ? track.getSettings() : {};
-  // Front cameras (and unlabelled desktop webcams) are mirrored once, on the stage.
+  // front cameras (and unlabelled desktop webcams) get mirrored once, on the stage
   const facing = settings.facingMode || (deviceId ? 'unknown' : facingMode);
   return { stream, track, settings, facing, mirror: facing !== 'environment' };
 }
@@ -44,7 +44,7 @@ export function stopStream(stream) {
   for (const t of stream.getTracks()) t.stop();
 }
 
-/** Maps getUserMedia failures (and missing APIs) to a title, a cause and fixes. */
+/** getUserMedia failures and missing APIs, turned into something the error card can show. */
 export function describeCameraError(err, support = cameraSupport()) {
   if (!support.secure) {
     return {

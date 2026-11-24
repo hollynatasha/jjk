@@ -1,5 +1,5 @@
-// Regenerates the four original pose-card SVGs in src/assets/pose-cards from
-// the procedural hand model. Run: node scripts/build-pose-cards.mjs
+// Redraws the pose-card SVGs in src/assets/pose-cards from the hand model.
+// node scripts/build-pose-cards.mjs
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

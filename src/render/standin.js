@@ -1,7 +1,6 @@
-// The simulation stand-in: a plain procedural silhouette in a plain
-// procedural room. It exists so the domains can be previewed without a
-// camera. It is labelled everywhere as a stand-in and never feeds the
-// recogniser.
+// Procedural silhouette in a procedural room, so the domains can be shown
+// without a camera. Labelled as a stand-in wherever it appears, and it never
+// feeds the recogniser.
 
 import { SIGN_SCENES, NEUTRAL_SCENES, scenePoints } from '../handmodel/poses.js';
 import { projectHand, HAND_CONNECTIONS } from '../handmodel/synthetic.js';
@@ -9,18 +8,25 @@ import { TAU, FONTS } from './draw.js';
 
 const VIRTUAL = { width: 640, height: 480 };
 
+// Figure is drawn for a 720x1280 stage and scaled into whatever the stage
+// really is, so a wide stage shows someone standing back, not a head filling
+// the frame.
+const DESIGN = { width: 720, height: 1280 };
+
 export class StandIn {
   constructor(W, H) {
     this.W = W;
     this.H = H;
+    this.k = H / DESIGN.height;
+    this.ox = (W - DESIGN.width * this.k) / 2;
   }
 
   /** A tracker-shaped frame for the stand-in's hands (virtual 640x480 camera). */
   frameFor(domainId, timeSec) {
     const scene = domainId && SIGN_SCENES[domainId] ? SIGN_SCENES[domainId].friendly : NEUTRAL_SCENES.relaxedBoth;
     const breathe = Math.sin(timeSec * 1.4);
-    // Smaller and a little lower than a real close-up, so the stand-in's
-    // face and the domain behind it stay readable in previews.
+    // smaller and lower than a real close-up, to keep the face and the domain
+    // behind it readable
     const hands = scenePoints(scene, { roll: breathe * 0.6, scale: 0.8 }).map(({ chirality, pts }) => {
       const placed = pts.map(([x, y, z]) => [x * 0.9, y + 0.045 + breathe * 0.002, z]);
       return projectHand(placed, { chirality, width: VIRTUAL.width, height: VIRTUAL.height, score: 0.99 });
@@ -64,9 +70,14 @@ export class StandIn {
 
   /** Silhouette body plus hands; `hands` are already in stage pixels. */
   drawFigure(g, hands, timeSec = 0) {
-    const { W, H } = this;
+    const W = DESIGN.width;
+    const H = DESIGN.height;
     const bob = Math.sin(timeSec * 1.4) * 2;
+    // Stage pixels -> this figure's own 720x1280 space.
+    const local = (p) => [(p[0] - this.ox) / this.k, p[1] / this.k];
     g.save();
+    g.translate(this.ox, 0);
+    g.scale(this.k, this.k);
     // torso
     const body = g.createLinearGradient(0, H * 0.6, 0, H);
     body.addColorStop(0, '#24262b');
@@ -103,7 +114,7 @@ export class StandIn {
       g.lineCap = 'round';
       g.lineWidth = 70;
       for (const h of hands) {
-        const wrist = h.pts[0];
+        const wrist = local(h.pts[0]);
         const elbowX = wrist[0] < W / 2 ? W * 0.18 : W * 0.82;
         g.beginPath();
         g.moveTo(elbowX, H + 40);
@@ -111,7 +122,7 @@ export class StandIn {
         g.lineTo(wrist[0], wrist[1]);
         g.stroke();
       }
-      for (const h of hands) this.drawHand(g, h.pts);
+      for (const h of hands) this.drawHand(g, h.pts.map(local));
     }
     g.restore();
   }

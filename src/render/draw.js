@@ -1,5 +1,5 @@
-// Canvas helpers shared by the four domains. Everything is procedural: no
-// image assets, so the export canvas never becomes tainted.
+// Canvas helpers shared by the domains. All procedural, no image assets, so
+// the export canvas never gets tainted.
 
 export const TAU = Math.PI * 2;
 
@@ -47,6 +47,81 @@ export function glow(g, x, y, r, color, alpha = 1) {
   g.beginPath();
   g.arc(x, y, r, 0, TAU);
   g.fill();
+}
+
+/**
+ * Cheap bloom: draw sharp, then draw a downscaled blurred copy over it with
+ * 'lighter'. Blurring the small copy is cheaper than blurring full size, and
+ * softer. `f` is the frame object, for its scratch canvases; no canvas filter
+ * support or f.low means one plain pass.
+ */
+export function withBloom(g, f, draw, { blur = 14, alpha = 0.75, slot = 6, scale = 0.4 } = {}) {
+  const probe = f.temp && f.temp(slot);
+  if (!probe || f.low || !canvasFilters(g)) {
+    draw(g);
+    return;
+  }
+  const w = Math.max(1, Math.round(f.W * scale));
+  const h = Math.max(1, Math.round(f.H * scale));
+  if (probe.width !== w || probe.height !== h) {
+    probe.width = w;
+    probe.height = h;
+  }
+  const pg = probe.getContext('2d');
+  pg.setTransform(1, 0, 0, 1, 0, 0);
+  pg.clearRect(0, 0, w, h);
+  pg.save();
+  pg.scale(scale, scale);
+  draw(pg);
+  pg.restore();
+  draw(g);
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  g.globalAlpha = alpha;
+  g.filter = `blur(${Math.max(1, blur * scale)}px)`;
+  g.drawImage(probe, 0, 0, f.W, f.H);
+  g.restore();
+  g.filter = 'none';
+}
+
+let filterOk = null;
+function canvasFilters(g) {
+  if (filterOk === null) filterOk = typeof g.filter === 'string';
+  return filterOk;
+}
+
+/** Builds the mote field once, in init. drawMotes renders it additively, so overlaps burn toward white. */
+export function seedMotes(rng, n, { speed = [6, 40], size = [0.8, 3.2], life = [1.2, 4] } = {}) {
+  return Array.from({ length: n }, () => ({
+    x: rng.range(0, 1),
+    y: rng.range(0, 1),
+    vx: rng.range(-1, 1) * rng.range(...speed) * 0.3,
+    vy: -rng.range(...speed),
+    r: rng.range(...size),
+    born: rng.range(0, 4),
+    life: rng.range(...life),
+    ph: rng.range(0, TAU),
+  }));
+}
+
+export function drawMotes(g, motes, { W, H, t }, color, alpha = 1) {
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  for (const m of motes) {
+    const age = (t - m.born) % (m.life + 0.6);
+    if (age < 0) continue;
+    const k = Math.sin((age / m.life) * Math.PI);
+    if (k <= 0.02) continue;
+    const x = (((m.x + (m.vx * age) / W) % 1) + 1) % 1;
+    const y = (((m.y + (m.vy * age) / H) % 1) + 1) % 1;
+    const wob = Math.sin(t * 1.6 + m.ph) * 3;
+    glow(g, x * W + wob, y * H, m.r * 5, color, 0.35 * k * alpha);
+    g.fillStyle = rgba(color, 0.9 * k * alpha);
+    g.beginPath();
+    g.arc(x * W + wob, y * H, m.r, 0, TAU);
+    g.fill();
+  }
+  g.restore();
 }
 
 export function polygon(g, pts) {
@@ -98,7 +173,7 @@ export function sparkPath(rng, x0, y0, x1, y1, segments = 6, amp = 8) {
   return pts;
 }
 
-/** Draws text with explicit tracking, one glyph at a time (portable across browsers). */
+/** Lays out text glyph by glyph with explicit tracking. Canvas letterSpacing is not everywhere yet. */
 export function trackedText(g, text, x, y, tracking, align = 'center') {
   const widths = [...text].map((ch) => g.measureText(ch).width);
   const total = widths.reduce((s, w) => s + w, 0) + tracking * Math.max(0, text.length - 1);
@@ -131,7 +206,7 @@ export function drawTracked(g, text, x, y, tracking, align = 'center', alphaFor 
   return layout;
 }
 
-/** Sizes a font so `text` fits in `maxWidth`. */
+// shrinks the font until text fits maxWidth, 12 tries then take what you get
 export function fitFont(g, text, family, weight, maxSize, maxWidth, tracking = 0) {
   let size = maxSize;
   for (let i = 0; i < 12; i++) {

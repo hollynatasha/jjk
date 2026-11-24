@@ -55,9 +55,9 @@ export function neutralCaptures(baseSeed = 5000) {
   return out;
 }
 
-export const LABELS = { gojo: 'Gojo', sukuna: 'Sukuna', megumi: 'Megumi', higuruma: 'Higuruma' };
+export const LABELS = { gojo: 'Gojo', sukuna: 'Sukuna', megumi: 'Megumi' };
 
-/** Mirror a frame horizontally the way a mirrored camera feed would look to the model. */
+/** Mirror a frame horizontally, like a mirrored camera feed reaching the model. */
 export function mirrorFrame(frame) {
   return {
     ...frame,

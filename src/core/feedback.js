@@ -1,8 +1,8 @@
-// One specific, actionable tip at a time, derived from what the tracker sees.
-// 30-80 cm and "normal indoor light" are guidance, not guarantees, so the tips
-// adapt to the visible palm size and the measured frame brightness.
+// One tip at a time, from whatever the tracker can see. The 30-80 cm and
+// "normal indoor light" numbers in the UI are guidance, not guarantees, so the
+// tips go off visible palm size and measured frame brightness instead.
 
-const NAMES = { gojo: 'Gojo', sukuna: 'Sukuna', megumi: 'Megumi', higuruma: 'Higuruma', neutral: 'a neutral pose' };
+const NAMES = { gojo: 'Gojo', sukuna: 'Sukuna', megumi: 'Megumi', neutral: 'a neutral pose' };
 
 export function brightnessTip(brightness) {
   if (brightness == null) return null;

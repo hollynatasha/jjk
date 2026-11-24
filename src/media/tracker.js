@@ -1,7 +1,7 @@
 // MediaPipe Tasks Vision: HandLandmarker (VIDEO mode, two hands) and the
-// person/background Image Segmenter. Everything runs in this browser tab;
-// frames never leave it. Calls are synchronous, so a busy flag makes
-// overlapping calls impossible and late frames are simply skipped.
+// person/background Image Segmenter. Runs in this tab, frames never leave it.
+// The detect calls are synchronous, so a busy flag keeps them from overlapping
+// and late frames are skipped.
 
 import { FilesetResolver, HandLandmarker, ImageSegmenter } from '@mediapipe/tasks-vision';
 import { routeNativeLogs } from './native-logs.js';
@@ -14,13 +14,13 @@ export const OFFICIAL_MODELS = {
 const BASE = import.meta.env.BASE_URL || './';
 const abs = (p) => new URL(p, document.baseURI).href;
 
-/** Model sources in the order they are tried. Local copies first when they exist (see vite.config.js). */
+/** Model sources in try order. Local copies first when they exist (see vite.config.js). */
 export function modelSources(params = new URLSearchParams(location.search)) {
   // eslint-disable-next-line no-undef
   const local = typeof __LOCAL_MODELS__ !== 'undefined' ? __LOCAL_MODELS__ : { hand: false, seg: false };
   const hand = [];
   const seg = [];
-  // Test switches: ?noLocalModels=1 skips vendored copies, ?offline=1 skips the official URLs.
+  // test switches: ?noLocalModels=1 skips vendored copies, ?offline=1 skips the official URLs
   const useLocal = params.get('noLocalModels') !== '1';
   const useOfficial = params.get('offline') !== '1';
   if (params.get('handModel')) hand.push({ url: abs(params.get('handModel')), label: 'override from URL' });
@@ -155,7 +155,7 @@ export class Tracker {
     throw new Error(errors.join(' | ') || 'no segmentation model source worked');
   }
 
-  /** Converts a HandLandmarkerResult into the plain frame shape the matcher uses. */
+  /** HandLandmarkerResult to the plain frame shape the matcher wants. */
   static toFrame(r, width, height) {
     const hands = (r.landmarks || []).map((lm, i) => {
       const cat = (r.handedness && r.handedness[i] && r.handedness[i][0]) || (r.handednesses && r.handednesses[i] && r.handednesses[i][0]) || {};
@@ -189,7 +189,7 @@ export class Tracker {
     }
   }
 
-  /** Runs segmentation and hands the person-probability mask to `sink(mask, w, h)` inside the callback. */
+  /** Segments, then calls `sink(mask, w, h)` with the person-probability mask inside the callback. */
   segment(video, now, sink) {
     if (!this.seg || this.busy || !video || video.readyState < 2 || !video.videoWidth) return false;
     this.busy = true;

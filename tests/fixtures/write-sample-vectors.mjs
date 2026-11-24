@@ -1,7 +1,6 @@
-// Writes tests/fixtures/sample-vectors.json: a SYNTHETIC training export made
-// from the procedural hand in src/handmodel (no camera, no person). It shows
-// exactly what the app stores (labelled landmark-derived vectors, nothing
-// else) and feeds the import and matcher tests. Run: npm run vectors
+// Writes tests/fixtures/sample-vectors.json: a SYNTHETIC training export from
+// the procedural hand in src/handmodel (no camera, no person). Same shape the
+// app stores, and the import/matcher tests read it. Run: npm run vectors
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { makeCapture, trainDomain, SIGN_SCENES, NEUTRAL_SCENES } from './hands.js';
@@ -14,7 +13,7 @@ const NEG_SCENE = { 'open-palm': 'openR', fist: 'fistR', peace: 'peaceR', wave: 
 
 export function buildSampleExport() {
   const captures = [];
-  for (const [di, domain] of ['gojo', 'sukuna', 'megumi', 'higuruma'].entries()) {
+  for (const [di, domain] of ['gojo', 'sukuna', 'megumi'].entries()) {
     const caps = trainDomain(domain, { scene: SIGN_SCENES[domain].friendly, baseSeed: 2000 + di * 400, createdAt: 1_700_000_000_000 + di * 1000 });
     caps.forEach((c, i) => {
       captures.push(serializeCapture({ ...c, id: `synthetic-${domain}-${i}`, variant: 'friendly', flipped: false, slot: i, view: SLOT_VIEWS[i].id }));

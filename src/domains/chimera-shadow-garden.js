@@ -1,31 +1,38 @@
-// Megumi / Chimera Shadow Garden. Liquid shadow leaks from beneath the hands,
-// spreads across the floor in branching pools, and the room sinks into a
-// deep ink garden with a faint teal horizon. Original angular animal shadows
-// (heron, fox, ram, carp: none of them the anime's shikigami) rise and
-// collapse into ripples, delayed shadow copies of the hands follow the
-// performer, and one wave of shadow rolls toward the camera. No gore.
+// Megumi / Chimera Shadow Garden. Drawn in code, nothing traced.
+// Shadow leaks out from under the hands, branches across the floor, and the
+// room turns into an ink garden behind a red lattice. No shikigami get drawn,
+// only the barrier.
 
-import { TAU, glow, rgba, ease, range01, clamp01, lerp, polygon, fitFont, FONTS, drawTracked } from '../render/draw.js';
+import { TAU, glow, rgba, ease, range01, clamp01, lerp, fitFont, FONTS, drawTracked, withBloom, seedMotes, drawMotes, hexToRgb } from '../render/draw.js';
 import { HAND_CONNECTIONS } from '../handmodel/synthetic.js';
+import { drawClipCover } from '../media/clips.js';
 
 const C = {
   ink: '#02040a',
   inkBlue: '#050b18',
-  sky: '#030712',
-  deep: '#071521',
+  sky: '#02040b',
+  deep: '#05070f',
   teal: '#5fe0c8',
   tealDim: '#1f6f6a',
   mist: '#9fe9da',
-  title: '#e3f8f3',
+  title: '#dff0ff',
+  // the barrier drawn around you, and the energy running through it
+  grid: '#e0264a',
+  gridHot: '#ff3b63',
+  arc: '#6fd4ff',
+  arcHot: '#eaf9ff',
+  arcDeep: '#2a6cff',
+  arcGreen: '#5dffae',
+  arcGreenDeep: '#10a86a',
 };
 
-// Original low-poly silhouettes in a 100x100 box, feet/base at y=100.
-const ANIMALS = {
-  heron: [[44, 100], [46, 70], [38, 60], [30, 58], [26, 52], [34, 46], [48, 46], [58, 30], [56, 16], [62, 6], [70, 8], [92, 12], [72, 14], [68, 22], [70, 36], [64, 50], [72, 62], [60, 66], [54, 70], [56, 100], [52, 100], [50, 72], [48, 100]],
-  fox: [[8, 100], [14, 78], [6, 64], [10, 54], [24, 58], [38, 52], [56, 52], [66, 40], [64, 22], [72, 34], [78, 22], [80, 38], [92, 46], [84, 52], [74, 56], [70, 70], [74, 100], [66, 100], [62, 74], [44, 72], [36, 100], [28, 100], [30, 72], [20, 74], [18, 100]],
-  ram: [[18, 100], [20, 72], [14, 60], [22, 46], [40, 42], [60, 42], [66, 30], [62, 20], [70, 12], [82, 14], [88, 24], [84, 36], [76, 34], [74, 26], [70, 28], [74, 40], [80, 48], [76, 58], [68, 60], [70, 100], [62, 100], [58, 68], [36, 70], [32, 100], [26, 100], [26, 74]],
-  carp: [[6, 62], [20, 48], [40, 40], [56, 32], [62, 22], [66, 34], [80, 40], [94, 30], [90, 54], [96, 74], [80, 64], [66, 70], [60, 84], [52, 72], [36, 76], [20, 74], [8, 68]],
-};
+// lerp two hex colours. rgba() here only takes hex, so hand back hex.
+function mixHex(a, b, k) {
+  const A = hexToRgb(a);
+  const B = hexToRgb(b);
+  const hex = (n) => Math.round(clamp01(n / 255) * 255).toString(16).padStart(2, '0');
+  return `#${hex(lerp(A[0], B[0], k))}${hex(lerp(A[1], B[1], k))}${hex(lerp(A[2], B[2], k))}`;
+}
 
 function persp(y, horizon, H) {
   return clamp01((y - horizon) / (H - horizon));
@@ -62,12 +69,11 @@ export default {
       floor: dripRng.range(H * 0.8, H * 0.93),
       r: dripRng.range(3, 6.5),
     }));
-    // Branching pool network from two landing zones under the hands.
     const poolRng = rng.fork('pools');
     const nodes = [];
     const perTree = low ? 10 : 20;
-    // Pools start under the hands and at both edges of the frame, where the
-    // floor stays visible around a performer in a portrait shot.
+    // roots go under the hands and at both frame edges, where the floor stays
+    // visible around a performer in a portrait shot
     const roots = [[W * 0.4, H * 0.9, 0.3], [W * 0.6, H * 0.9, 0.32], [W * 0.07, H * 0.66, 0.42], [W * 0.93, H * 0.66, 0.44]];
     for (let tree = 0; tree < roots.length; tree++) {
       const [rootX, rootY, at] = roots[tree];
@@ -90,27 +96,31 @@ export default {
         }
       }
     }
-    const gardenRng = rng.fork('garden');
-    const reeds = Array.from({ length: low ? 18 : 40 }, () => {
-      const x = gardenRng.range(-20, W + 20);
-      return { x, h: gardenRng.range(40, 170), bend: gardenRng.range(-30, 30), w: gardenRng.range(1, 2.6), ph: gardenRng.range(0, TAU) };
-    });
-    const stones = Array.from({ length: 9 }, () => ({ x: gardenRng.range(0, W), y: gardenRng.range(horizon + 10, horizon + 70), rx: gardenRng.range(18, 60), ry: gardenRng.range(7, 18) }));
-    const trees = Array.from({ length: 3 }, (_, i) => ({ x: [W * 0.12, W * 0.86, W * 0.7][i], h: gardenRng.range(H * 0.18, H * 0.3), lean: gardenRng.range(-0.15, 0.15), branches: Array.from({ length: 5 }, () => ({ at: gardenRng.range(0.35, 0.9), len: gardenRng.range(30, 90), ang: gardenRng.range(-2.4, -0.7) * (gardenRng.chance(0.5) ? 1 : -1) })) }));
-    const animalOrder = ['heron', 'fox', 'ram', 'carp'];
-    const animalRng = rng.fork('animals');
-    // They rise at the edges, beside the performer, where they stay visible.
-    const xs = animalRng.shuffle([W * 0.13, W * 0.87, W * 0.2, W * 0.8]);
-    const animals = animalOrder.map((kind, i) => ({
-      kind,
-      t0: 1.6 + i * 0.75 + animalRng.range(-0.1, 0.1),
-      x: xs[i],
-      baseY: horizon + animalRng.range(0.05, 0.11) * H,
-      size: animalRng.range(170, 220),
-      flip: xs[i] > W / 2,
+    // the barrier grid, scrolling toward the camera
+    const gridRng = rng.fork('grid');
+    const grid = {
+      rows: low ? 9 : 14,
+      cols: low ? 10 : 16,
+      drift: gridRng.range(0.05, 0.09),
+      jitter: Array.from({ length: 20 }, () => gridRng.range(-0.004, 0.004)),
+    };
+    const arcRng = rng.fork('arcs');
+    const nArcs = low ? 11 : 20;
+    const tendrils = Array.from({ length: nArcs }, (_, i) => ({
+      // fanned evenly across the upper half, then jittered
+      ang: -Math.PI * 1.04 + (Math.PI * 1.08 * (i + 0.5)) / nArcs + arcRng.range(-0.08, 0.08),
+      len: arcRng.range(0.42, 0.95),
+      wob: arcRng.range(0.25, 0.9),
+      ph: arcRng.range(0, TAU),
+      sp: arcRng.range(0.5, 1.6),
+      w: arcRng.range(1, 3.4),
+      t0: arcRng.range(1.1, 2.0),
+      branch: arcRng.range(0.45, 0.8),
+      hot: arcRng.chance(0.3),
     }));
+    const motes = seedMotes(rng.fork('motes'), low ? 26 : 60, { speed: [10, 46], size: [0.7, 2.6], life: [1.4, 3.6] });
     const flecks = Array.from({ length: low ? 20 : 48 }, () => ({ x: rng.range(0, W), off: rng.range(-12, 12), s: rng.range(1, 2.4) }));
-    return { horizon, drips, nodes, reeds, stones, trees, animals, flecks };
+    return { horizon, drips, nodes, grid, tendrils, motes, flecks };
   },
 
   charge(g, f, p, sec) {
@@ -145,7 +155,7 @@ export default {
 
     f.room.draw(g, {});
 
-    // Ink level rising from the floor during the rupture; draining during dissolve.
+    // ink rises off the floor through the rupture, drains back out on dissolve
     const rise = reduced ? ease.inOutSine(ph.rupture) : ease.inOut(ph.rupture);
     const levelIn = H - (H + 60) * rise;
     const drain = ease.inOut(ph.dissolve);
@@ -165,103 +175,140 @@ export default {
     }
 
     this.pools(g, s, f);
-    this.animals(g, s, f);
+    if (!f.clip) withBloom(g, f, (gg) => this.tendrils(gg, s, f), { blur: 18, alpha: 0.85 });
     this.wave(g, s, f, false);
 
+    if (f.particles) f.particles(g);
     if (f.person.available) {
-      f.person.draw(g, { rim: 'rgba(95,224,200,0.75)', rimBlur: f.low ? 0 : 16, grade: '#0a1d3a', gradeAlpha: 0.22 * ph.world });
+      f.person.draw(g, { rim: 'rgba(111,212,255,0.8)', rimBlur: f.low ? 0 : 16, grade: '#0a1d3a', gradeAlpha: 0.22 * ph.world });
     } else if (ph.world > 0) {
       f.portalRoom(g, { cx: W / 2, cy: H * 0.44, rx: W * 0.41, ry: H * 0.3, feather: 60, edge: 'liquid', alpha: 1, grade: '#0a1d3a', gradeAlpha: 0.25 * ph.world, t });
     }
 
-    // In front of the performer: delayed shadow hands, drips falling from the
-    // real hands, and shadow flooding the bottom edge of the frame.
+    // everything below here draws in front of the performer
     if (ph.world > 0.05) this.shadowHands(g, s, f);
     this.drips(g, s, f, hands);
     this.floorInk(g, s, f, hands);
     this.wave(g, s, f, true);
-    this.title(g, f);
   },
 
+  // Black, with a red perspective grid on the floor and overhead, both
+  // scrolling toward the camera. Horizon sits where the shadow meets it.
   garden(g, s, f) {
     const { W, H, t } = f;
     const hz = s.horizon;
-    const sky = g.createLinearGradient(0, 0, 0, hz);
-    sky.addColorStop(0, C.sky);
-    sky.addColorStop(1, C.deep);
-    g.fillStyle = sky;
-    g.fillRect(0, 0, W, hz);
-    const floor = g.createLinearGradient(0, hz, 0, H);
-    floor.addColorStop(0, '#04101a');
-    floor.addColorStop(1, C.ink);
-    g.fillStyle = floor;
-    g.fillRect(0, hz, W, H - hz);
-    // faint teal horizon
+    const vx = W / 2;
+    // if a backdrop clip loaded, it stands in for the barrier: starts pushed
+    // in at 1.45 and pulls back to 1 over the first 4.2s
+    const zoom = lerp(1.45, 1, ease.outCubic(clamp01(t / 4.2)));
+    if (f.clip && drawClipCover(g, f.clip, W, H, zoom)) return;
+    // slow creep toward the camera so the barrier is never a still image
     g.save();
-    g.strokeStyle = rgba(C.teal, 0.45);
-    g.lineWidth = 1.2;
-    g.shadowColor = 'rgba(95,224,200,0.8)';
-    g.shadowBlur = f.low ? 0 : 14;
+    g.translate(vx, hz);
+    const push = 1 + 0.06 * ease.outCubic(clamp01(t / 6.5));
+    g.scale(push, push);
+    g.translate(-vx, -hz);
+    g.fillStyle = C.ink;
+    g.fillRect(0, 0, W, H);
+    glow(g, vx, hz, W * 0.75, '#12040d', 0.9);
+
+    const gr = s.grid;
+    const scroll = (t * gr.drift) % 1;
+    g.save();
+    g.lineCap = 'butt';
+    // rails receding to the horizon, plus a fan running away from it
+    for (const dir of [1, -1]) {
+      const far = dir > 0 ? H : 0;
+      for (let i = 0; i < gr.rows; i++) {
+        const u = (i + scroll) / gr.rows;
+        const d = Math.pow(u, 2.3);
+        const y = hz + dir * (far - hz) * d;
+        const a = (0.07 + 0.5 * d) * (dir > 0 ? 1 : 0.5);
+        g.strokeStyle = rgba(C.grid, a);
+        g.lineWidth = 0.6 + 2.2 * d;
+        g.beginPath();
+        g.moveTo(0, y);
+        g.lineTo(W, y);
+        g.stroke();
+      }
+      for (let i = 0; i <= gr.cols; i++) {
+        const k = i / gr.cols - 0.5;
+        g.strokeStyle = rgba(C.grid, dir > 0 ? 0.3 : 0.14);
+        g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(vx + k * W * 0.1, hz);
+        g.lineTo(vx + k * W * 3.4 + (gr.jitter[i % gr.jitter.length] || 0) * W, dir > 0 ? H : 0);
+        g.stroke();
+      }
+    }
+    // the horizon itself, hot where the grid converges
+    g.strokeStyle = rgba(C.gridHot, 0.75);
+    g.lineWidth = 1.4;
+    g.shadowColor = rgba(C.gridHot, 0.9);
+    g.shadowBlur = f.low ? 0 : 16;
     g.beginPath();
     g.moveTo(0, hz);
     g.lineTo(W, hz);
     g.stroke();
     g.restore();
-    glow(g, W / 2, hz, W * 0.6, C.tealDim, 0.22);
-    // mist bands
-    for (let i = 0; i < 3; i++) {
-      const y = hz - 40 - i * 70 + Math.sin(t * 0.3 + i) * 8;
-      const m = g.createLinearGradient(0, y - 30, 0, y + 30);
-      m.addColorStop(0, rgba(C.mist, 0));
-      m.addColorStop(0.5, rgba(C.mist, 0.035));
-      m.addColorStop(1, rgba(C.mist, 0));
-      g.fillStyle = m;
-      g.fillRect(0, y - 30, W, 60);
-    }
-    // ink trees: original brush-like trunks
+    g.restore();
+  },
+
+  // Cursed energy whipping out of a point above the performer. Additive, so
+  // the crossings burn out to white.
+  tendrils(g, s, f) {
+    const { W, H, t, ph } = f;
+    if (ph.world <= 0) return;
+    const R = Math.min(W, H);
+    const src = [W / 2, H * 0.2];
+    const fade = (1 - ease.inOut(ph.dissolve)) * clamp01(ph.world * 2);
+    // comes up green, turns blue as the domain settles
+    const blueness = ease.inOut(clamp01((t - 2.4) / 1.8));
+    const body = mixHex(C.arcGreen, C.arc, blueness);
+    const deep = mixHex(C.arcGreenDeep, C.arcDeep, blueness);
     g.save();
-    g.strokeStyle = '#03070d';
+    g.globalCompositeOperation = 'lighter';
     g.lineCap = 'round';
-    for (const tr of s.trees) {
-      g.lineWidth = 9;
-      const topX = tr.x + tr.lean * tr.h;
-      g.beginPath();
-      g.moveTo(tr.x, hz + 6);
-      g.quadraticCurveTo(tr.x + tr.lean * tr.h * 0.3, hz - tr.h * 0.5, topX, hz - tr.h);
-      g.stroke();
-      g.lineWidth = 3;
-      for (const b of tr.branches) {
-        const bx = lerp(tr.x, topX, b.at);
-        const by = hz - tr.h * b.at;
+    g.lineJoin = 'round';
+    for (const d of s.tendrils) {
+      const age = t - d.t0;
+      if (age < 0) continue;
+      const grow = clamp01(age / 0.5);
+      const a = d.hot ? 0.9 : 0.55;
+      const len = d.len * R * grow;
+      const steps = 7;
+      const pts = [src];
+      for (let i = 1; i <= steps; i++) {
+        const u = i / steps;
+        const wob = Math.sin(t * d.sp * 2.2 + d.ph + u * 5) * d.wob * R * 0.07 * u;
+        const ang = d.ang + Math.sin(t * d.sp + d.ph) * 0.12;
+        pts.push([
+          src[0] + Math.cos(ang) * len * u - Math.sin(ang) * wob,
+          src[1] + Math.sin(ang) * len * u + Math.cos(ang) * wob,
+        ]);
+      }
+      for (const [col, w, al] of [[deep, d.w * 3.4, 0.16], [body, d.w * 1.5, 0.5], [C.arcHot, d.w * 0.5, a]]) {
+        g.strokeStyle = rgba(col, al * fade);
+        g.lineWidth = w;
         g.beginPath();
-        g.moveTo(bx, by);
-        g.lineTo(bx + Math.cos(b.ang) * b.len, by + Math.sin(b.ang) * b.len * 0.6);
+        g.moveTo(pts[0][0], pts[0][1]);
+        for (const p of pts.slice(1)) g.lineTo(p[0], p[1]);
         g.stroke();
       }
-    }
-    g.restore();
-    // stones
-    g.fillStyle = '#03060c';
-    for (const st of s.stones) {
+      // one fork near the end
+      const b = pts[Math.floor(steps * d.branch)];
+      const tip = pts[pts.length - 1];
+      g.strokeStyle = rgba(body, 0.3 * fade);
+      g.lineWidth = d.w;
       g.beginPath();
-      g.ellipse(st.x, st.y, st.rx, st.ry, 0, 0, TAU);
-      g.fill();
-    }
-    // reeds with a teal rim, swaying slowly
-    g.save();
-    for (const r of s.reeds) {
-      const sway = Math.sin(t * 0.8 + r.ph) * 8;
-      g.strokeStyle = '#04090f';
-      g.lineWidth = r.w + 1;
-      g.beginPath();
-      g.moveTo(r.x, hz + 4);
-      g.quadraticCurveTo(r.x + r.bend * 0.4, hz - r.h * 0.6, r.x + r.bend + sway, hz - r.h);
-      g.stroke();
-      g.strokeStyle = rgba(C.teal, 0.12);
-      g.lineWidth = 0.8;
+      g.moveTo(b[0], b[1]);
+      g.lineTo(b[0] + (tip[0] - b[0]) * 0.7 + Math.sin(t * 2 + d.ph) * R * 0.05, b[1] + (tip[1] - b[1]) * 0.4 - R * 0.04);
       g.stroke();
     }
+    glow(g, src[0], src[1], R * 0.16, body, 0.32 * fade);
+    glow(g, src[0], src[1], R * 0.05, C.arcHot, 0.5 * fade);
     g.restore();
+    drawMotes(g, s.motes, f, body, 0.55 * fade);
   },
 
   pools(g, s, f) {
@@ -368,61 +415,6 @@ export default {
     g.restore();
   },
 
-  animals(g, s, f) {
-    const { t } = f;
-    for (const an of s.animals) {
-      const tt = t - an.t0;
-      if (tt < 0 || tt > 2.6) continue;
-      const riseK = ease.outCubic(clamp01(tt / 0.5));
-      const collapse = range01(tt, 1.0, 1.6);
-      const h = an.size * riseK * (1 - ease.inCubic(collapse) * 0.95);
-      const pts = ANIMALS[an.kind];
-      const sc = an.size / 100;
-      if (h > 1) {
-        g.save();
-        // only the part above the pool surface is visible: it rises out of the liquid
-        g.beginPath();
-        g.rect(an.x - an.size, an.baseY - an.size * 1.2, an.size * 2, an.size * 1.2);
-        g.clip();
-        g.translate(an.x, an.baseY + (an.size - h) * 0.9);
-        g.scale(an.flip ? -sc : sc, sc * (0.92 + 0.08 * riseK));
-        g.translate(-50, -100);
-        g.fillStyle = C.ink;
-        polygon(g, pts);
-        g.fill();
-        g.strokeStyle = rgba(C.teal, 0.35);
-        g.lineWidth = 1.2 / sc;
-        g.stroke();
-        g.restore();
-        // faint reflection in the pool
-        g.save();
-        g.globalAlpha = 0.18 * riseK * (1 - collapse);
-        g.translate(an.x, an.baseY + 6);
-        g.scale(an.flip ? -sc : sc, -sc * 0.35);
-        g.translate(-50, -100);
-        g.fillStyle = rgba(C.teal, 0.5);
-        polygon(g, pts);
-        g.fill();
-        g.restore();
-      }
-      // ripples after the collapse
-      const rp = range01(tt, 1.25, 2.6);
-      if (rp > 0 && rp < 1) {
-        g.save();
-        for (let k = 0; k < 3; k++) {
-          const q = clamp01(rp - k * 0.15);
-          if (q <= 0) continue;
-          g.strokeStyle = rgba(C.teal, 0.35 * (1 - q));
-          g.lineWidth = 1.2;
-          g.beginPath();
-          g.ellipse(an.x, an.baseY, an.size * 0.25 + q * an.size * 0.9, (an.size * 0.25 + q * an.size * 0.9) * 0.22, 0, 0, TAU);
-          g.stroke();
-        }
-        g.restore();
-      }
-    }
-  },
-
   wave(g, s, f, front) {
     const { W, H, t } = f;
     const t0 = f.reduced ? 4.2 : 4.4;
@@ -490,7 +482,7 @@ export default {
     g.restore();
     g.font = `500 14px ${FONTS.mono}`;
     g.fillStyle = rgba(C.mist, 0.7 * out * clamp01((t - t0 - 0.9) / 0.6));
-    drawTracked(g, 'permit hrd-03 · shadows on loan', W / 2, y + 52, 1.4, 'center');
+    drawTracked(g, 'permit hrd-03 · shadows on loan · @hollynst', W / 2, y + 52, 1.4, 'center');
     g.restore();
   },
 };

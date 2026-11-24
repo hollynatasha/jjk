@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeView, toCanvas, applyVideoTransform, viewMatrix, handsToCanvas, onStage } from '../src/render/geometry.js';
 
-/** Minimal context that tracks the current transform, like a real 2D canvas. */
+/** Minimal context that tracks the current transform. */
 function matrixContext() {
   let m = [1, 0, 0, 1, 0, 0];
   const mul = ([a, b, c, d, e, f], [a2, b2, c2, d2, e2, f2]) => [a * a2 + c * b2, b * a2 + d * b2, a * c2 + c * d2, b * c2 + d * d2, a * e2 + c * f2 + e, b * e2 + d * f2 + f];

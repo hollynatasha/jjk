@@ -1,4 +1,4 @@
-// Teach-mode prompts: twelve views per sign and eight neutral poses.
+// Teach-mode prompts: 12 views per sign, 8 neutral poses.
 
 export const SLOT_VIEWS = [
   { id: 'center', short: 'C1', label: 'Face the camera' },

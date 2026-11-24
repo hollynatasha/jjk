@@ -4,7 +4,7 @@ import { extractFrameFeatures } from '../src/core/features.js';
 import { DOMAINS, domainById } from '../src/domains/catalog.js';
 import { trainDomain, neutralCaptures, featFor, frameFor, mirrorFrame, SIGN_SCENES, NEUTRAL_SCENES, LABELS } from './fixtures/hands.js';
 
-const IDS = ['gojo', 'sukuna', 'megumi', 'higuruma'];
+const IDS = ['gojo', 'sukuna', 'megumi'];
 const VIEWS = ['center', 'left', 'right', 'near', 'far', 'mid'];
 
 function fullTraining() {
@@ -17,7 +17,7 @@ function fullTraining() {
   return caps;
 }
 
-describe('pose matcher with all four signs taught', () => {
+describe('pose matcher with every sign taught', () => {
   let m;
   beforeAll(() => {
     m = new PoseMatcher();
@@ -64,11 +64,11 @@ describe('pose matcher with all four signs taught', () => {
   });
 
   it('rejects the wrong number of hands', () => {
-    // A two-hand sign with one hand hidden
+    // two-hand sign, one hand hidden
     const sukuna = frameFor(SIGN_SCENES.sukuna.friendly, 77);
     const oneHand = { ...sukuna, hands: [sukuna.hands[0]] };
     const r1 = m.classify(extractFrameFeatures(oneHand));
-    expect(r1.accepted && ['sukuna', 'megumi', 'higuruma'].includes(r1.best)).toBe(false);
+    expect(r1.accepted && ['sukuna', 'megumi'].includes(r1.best)).toBe(false);
     // Gojo's one-hand sign with an extra hand in frame
     const gojo = frameFor(SIGN_SCENES.gojo.friendly, 78);
     const extra = frameFor(NEUTRAL_SCENES.openL, 79);
@@ -77,7 +77,7 @@ describe('pose matcher with all four signs taught', () => {
   });
 
   it('survives a tracker hand-order or label swap', () => {
-    for (const d of ['sukuna', 'megumi', 'higuruma']) {
+    for (const d of ['sukuna', 'megumi']) {
       for (let i = 0; i < 6; i++) {
         const f = frameFor(SIGN_SCENES[d].friendly, 31000 + i, { view: VIEWS[i % 6] });
         const swapped = { ...f, hands: f.hands.slice().reverse().map((h) => ({ ...h, handedness: h.handedness === 'Left' ? 'Right' : 'Left' })) };
@@ -87,14 +87,6 @@ describe('pose matcher with all four signs taught', () => {
     }
   });
 
-  it('rejects swapped hand roles for the asymmetric Higuruma sign', () => {
-    // Mirror image: upright palm on the other hand, gavel on the other side.
-    for (let i = 0; i < 8; i++) {
-      const f = mirrorFrame(frameFor(SIGN_SCENES.higuruma.friendly, 32000 + i, { view: VIEWS[i % 6] }));
-      const r = m.classify(extractFrameFeatures(f));
-      expect(r.accepted && r.best === 'higuruma').toBe(false);
-    }
-  });
 
   it('keeps a handedness gate: Gojo taught with the right hand does not fire for the left', () => {
     let gated = 0;
@@ -123,7 +115,7 @@ describe('pose matcher with all four signs taught', () => {
       expect(r.accepted).toBe(true);
       ids.add(domainById(r.best).animationId);
     }
-    expect([...ids].sort()).toEqual(['chimera-shadow-garden', 'deadly-sentencing', 'malevolent-shrine', 'unlimited-void']);
+    expect([...ids].sort()).toEqual(['chimera-shadow-garden', 'malevolent-shrine', 'unlimited-void']);
   });
 
   it('reports a confidence that is higher for a clean sign than for a neutral pose', () => {
@@ -139,7 +131,7 @@ describe('training lifecycle', () => {
     const m = new PoseMatcher();
     m.setData([...neutralCaptures(), ...trainDomain('gojo', { baseSeed: 2000 })], LABELS);
     expect(Object.keys(m.models)).toEqual(['gojo']);
-    for (const d of ['sukuna', 'megumi', 'higuruma']) {
+    for (const d of ['sukuna', 'megumi']) {
       for (let i = 0; i < 10; i++) {
         const r = m.classify(featFor(SIGN_SCENES[d].friendly, 37000 + i));
         expect(r.accepted).toBe(false);
@@ -152,10 +144,10 @@ describe('training lifecycle', () => {
     const caps = [...neutralCaptures(), ...trainDomain('sukuna', { baseSeed: 2100, createdAt: 5 })];
     m.setData(caps, LABELS);
     expect(m.isTrained('sukuna')).toBe(true);
-    expect(m.isTrained('higuruma')).toBe(false);
-    m.setData([...caps, ...trainDomain('higuruma', { baseSeed: 2200, createdAt: 50 })], LABELS);
-    expect(m.isTrained('higuruma')).toBe(true);
-    expect(m.classify(featFor(SIGN_SCENES.higuruma.friendly, 38000)).best).toBe('higuruma');
+    expect(m.isTrained('megumi')).toBe(false);
+    m.setData([...caps, ...trainDomain('megumi', { baseSeed: 2200, createdAt: 50 })], LABELS);
+    expect(m.isTrained('megumi')).toBe(true);
+    expect(m.classify(featFor(SIGN_SCENES.megumi.friendly, 38000)).best).toBe('megumi');
   });
 
   it('reports incomplete sets honestly', () => {
@@ -182,16 +174,16 @@ describe('training lifecycle', () => {
     const caps = [
       ...neutralCaptures(),
       ...trainDomain('sukuna', { baseSeed: 3000, createdAt: 10 }),
-      // "Megumi" taught with essentially the same seal, a little later
+      // "Megumi" taught with the same seal, a little later
       ...trainDomain('megumi', { scene: SIGN_SCENES.sukuna.friendly, baseSeed: 3500, createdAt: 40 }),
     ];
     m.setData(caps, LABELS);
     const r = m.reports.megumi;
     expect(r.status).toBe('confusable');
     expect(r.confusedWith).toBe('sukuna');
-    expect(r.message).toMatch(/Megumi resembles Sukuna in \d+\/12 tries—separate wrists or retrain\./);
+    expect(r.message).toMatch(/Megumi resembles Sukuna in \d+\/12 tries; separate wrists or retrain\./);
     expect(m.isTrained('megumi')).toBe(false);
-    // The older, working sign keeps working
+    // the older sign still works
     expect(m.reports.sukuna.status).toBe('learned');
     expect(m.classify(featFor(SIGN_SCENES.sukuna.friendly, 39500)).best).toBe('sukuna');
   });
@@ -215,10 +207,83 @@ describe('training lifecycle', () => {
 });
 
 describe('roster', () => {
-  it('has exactly the four domains and four distinct animation ids', () => {
+  it('has exactly the catalogued domains, each with a distinct animation id', () => {
     expect(DOMAINS.map((d) => d.id)).toEqual(IDS);
-    expect(new Set(DOMAINS.map((d) => d.animationId)).size).toBe(4);
-    expect(DOMAINS.find((d) => d.id === 'higuruma').researchStatus).toBe('fan-made');
+    expect(new Set(DOMAINS.map((d) => d.animationId)).size).toBe(IDS.length);
     for (const d of DOMAINS) expect(d.officialRef.url).toMatch(/^https:\/\/jujutsukaisen\.jp\//);
+  });
+});
+
+// Accuracy gate: MATCH_DEFAULTS is tuned against scripts/eval-matcher.mjs and
+// this stops it drifting back. Bounds sit well clear of the measured numbers
+// so noise in the synthetic hands can't fail the build.
+describe('matcher accuracy on held-out frames', () => {
+  const NOISES = [1, 1.6, 2.2];
+  const TRIALS = 10;
+  let m;
+  beforeAll(() => {
+    m = new PoseMatcher();
+    m.setData(fullTraining(), LABELS);
+  });
+
+  it('fires for at least 90% of correctly made signs, across every view and noise level', () => {
+    let seed = 700000;
+    let accepted = 0;
+    let total = 0;
+    const perSign = {};
+    for (const d of IDS) {
+      perSign[d] = { a: 0, n: 0 };
+      for (const variant of ['friendly', 'canonical']) {
+        const scene = SIGN_SCENES[d][variant];
+        if (!scene) continue;
+        for (const view of VIEWS) {
+          for (const noise of NOISES) {
+            for (let i = 0; i < TRIALS; i++) {
+              const r = m.classify(featFor(scene, (seed += 7), { view, noise }));
+              total++;
+              perSign[d].n++;
+              if (r.accepted && r.best === d) {
+                accepted++;
+                perSign[d].a++;
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(accepted / total).toBeGreaterThan(0.9);
+    // per-sign floor as well, so a good average can't hide one bad sign
+    for (const d of IDS) expect(perSign[d].a / perSign[d].n).toBeGreaterThan(0.75);
+  });
+
+  it('still almost never fires on a neutral pose, and never as the wrong sign', () => {
+    let seed = 800000;
+    let fired = 0;
+    let total = 0;
+    for (const scene of Object.values(NEUTRAL_SCENES)) {
+      for (const view of VIEWS) {
+        for (const noise of NOISES) {
+          for (let i = 0; i < TRIALS; i++) {
+            total++;
+            if (m.classify(featFor(scene, (seed += 11), { view, noise })).accepted) fired++;
+          }
+        }
+      }
+    }
+    expect(fired / total).toBeLessThan(0.01);
+
+    let wrong = 0;
+    let n = 0;
+    for (const d of IDS) {
+      for (const view of VIEWS) {
+        for (let i = 0; i < TRIALS; i++) {
+          const r = m.classify(featFor(SIGN_SCENES[d].friendly, (seed += 13), { view, noise: 1.6 }));
+          n++;
+          if (r.accepted && r.best !== d) wrong++;
+        }
+      }
+    }
+    expect(wrong).toBe(0);
+    expect(n).toBeGreaterThan(0);
   });
 });

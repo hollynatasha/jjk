@@ -1,10 +1,17 @@
-// The gesture library: four paper pose cards, visible before training and
-// again from Live. Each has an original drawing, text instructions, an
-// official reference link and a status badge that never relies on colour.
+// Gesture library: one paper pose card per domain, shown before training and
+// again from Live. The badge spells its state out in words, never colour alone.
 
 import { h, button, ICON } from './dom.js';
 import { poseSVG } from './posecard.js';
 import { DOMAINS } from '../domains/catalog.js';
+
+// Frames this app rendered itself, grabbed off the real stage in simulation
+// mode. The card should show what the sign opens, not another hand.
+const STILL = {
+  gojo: { src: '/stills/gojo-3p2.jpg', alt: 'Unlimited Void mid-cast: red and violet arcs rushing outward through a field of white motes.' },
+  sukuna: { src: '/stills/sukuna-3p2.jpg', alt: 'Malevolent Shrine mid-cast: red cords strung over a dark shrine standing in still water.' },
+  megumi: { src: '/stills/megumi-5p6.jpg', alt: 'Chimera Shadow Garden mid-cast: pale blue arcs thrown outward over a dark grid.' },
+};
 
 function kindLine(app, d) {
   const variant = app.settings.variant[d.id] || 'friendly';
@@ -27,11 +34,19 @@ export function renderCards(app) {
     const detailsId = `card-details-${d.id}`;
     const card = h(
       'article',
-      { class: 'card', id: `card-${d.id}`, 'aria-labelledby': `card-title-${d.id}` },
+      { class: 'card', id: `card-${d.id}`, style: { '--accent': d.accent }, 'aria-labelledby': `card-title-${d.id}` },
+      STILL[d.id]
+        ? h('div', { class: 'card-still' }, h('img', { src: STILL[d.id].src, alt: STILL[d.id].alt, width: 1600, height: 900, loading: 'lazy' }))
+        : null,
       h(
         'header',
         { class: 'card-head' },
-        h('h3', { id: `card-title-${d.id}` }, d.character, h('small', null, d.domainName)),
+        h(
+          'div',
+          { class: 'card-title' },
+          h('h3', { id: `card-title-${d.id}` }, d.character),
+          h('p', { class: 'card-sub' }, h('span', { class: 'jp', lang: 'ja' }, d.kanji), d.domainName),
+        ),
         h('span', { class: 'badge tone-none', id: `badge-${d.id}` }, 'Not trained'),
       ),
       h('div', { class: 'card-drawing', svg: poseSVG(d.id, { variant: variant === 'canonical' ? 'canonical' : 'friendly', flipped, size: 300 }) }),

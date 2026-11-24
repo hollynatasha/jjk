@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SignChallenge } from '../src/core/challenge.js';
 
-const SIGNS = ['gojo', 'sukuna', 'megumi', 'higuruma'];
+const SIGNS = ['gojo', 'sukuna', 'megumi'];
 
 /** Plays a scripted user: `respond(target)` returns what the matcher accepts during a trial. */
 function play(ch, respond, { restResponse = () => null } = {}) {
@@ -21,7 +21,7 @@ function play(ch, respond, { restResponse = () => null } = {}) {
 describe('Test my signs challenge', () => {
   it('asks five times per sign in a seeded random order', () => {
     const ch = new SignChallenge({ domains: SIGNS, seed: 42 });
-    expect(ch.order).toHaveLength(20);
+    expect(ch.order).toHaveLength(SIGNS.length * 5);
     for (const d of SIGNS) expect(ch.order.filter((x) => x === d)).toHaveLength(5);
     expect(ch.order.every((d, i) => i === 0 || d !== ch.order[i - 1])).toBe(true);
     const again = new SignChallenge({ domains: SIGNS, seed: 42 });
@@ -77,10 +77,10 @@ describe('Test my signs challenge', () => {
 
   it('shows false positives cast during rest', () => {
     let restFrames = 0;
-    const res = play(new SignChallenge({ domains: ['gojo', 'higuruma'], seed: 4 }), (t) => t, {
-      restResponse: (snap) => (snap.index === 2 && restFrames++ < 30 ? 'higuruma' : null),
+    const res = play(new SignChallenge({ domains: ['gojo', 'megumi'], seed: 4 }), (t) => t, {
+      restResponse: (snap) => (snap.index === 2 && restFrames++ < 30 ? 'megumi' : null),
     });
     expect(res.falsePositives.length).toBeGreaterThanOrEqual(1);
-    expect(res.falsePositives[0].domain).toBe('higuruma');
+    expect(res.falsePositives[0].domain).toBe('megumi');
   });
 });

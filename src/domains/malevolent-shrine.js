@@ -1,10 +1,14 @@
-// Sukuna / Malevolent Shrine. Original paper-cut art, not a trace of the
-// anime's shrine: the two-hand midpoint becomes an ember, black ink spills
-// across the floor, a three-layer paper pavilion unfolds behind the
-// performer, and crimson slash arcs cross around them leaving torn-paper gashes
-// and drifting ash. Oxblood, ember orange and charcoal. No gore.
+// Sukuna / Malevolent Shrine.
+//
+// Flat paper cut-outs, all polygons built in code: tiered shrine, skull crown,
+// bone rafters, a bone pile at the floor. Nothing traced from a frame, and it
+// stops at bone.
+//
+// Order: hand midpoint lights up, ink spills over the floor, three paper layers
+// unfold behind the performer, then crimson slashes leave torn gashes and ash.
 
 import { TAU, glow, rgba, ease, range01, clamp01, lerp, polygon, tornOutline, fitFont, FONTS, drawTracked } from '../render/draw.js';
+import { drawClipCover } from '../media/clips.js';
 
 const C = {
   char: '#0b0606',
@@ -38,6 +42,77 @@ function roof(cx, y, rw, rh, up) {
 
 const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
 
+/** Ellipse as a polygon, optionally rotated by `rot` radians. */
+function ellipse(cx, cy, rx, ry, rot = 0, steps = 22) {
+  const pts = [];
+  const c = Math.cos(rot);
+  const s = Math.sin(rot);
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * TAU;
+    const x = Math.cos(a) * rx;
+    const y = Math.sin(a) * ry;
+    pts.push([cx + x * c - y * s, cy + x * s + y * c]);
+  }
+  return pts;
+}
+
+/** A capsule (long bone) between two points. */
+function bone(x0, y0, x1, y1, w) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const l = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / l) * w;
+  const ny = (dx / l) * w;
+  const ex = (dx / l) * w * 0.8;
+  const ey = (dy / l) * w * 0.8;
+  return [
+    [x0 + nx - ex, y0 + ny - ey], [x1 + nx + ex, y1 + ny + ey],
+    [x1 + nx * 0.4 + ex * 1.6, y1 + ny * 0.4 + ey * 1.6],
+    [x1 - nx * 0.4 + ex * 1.6, y1 - ny * 0.4 + ey * 1.6],
+    [x1 - nx + ex, y1 - ny + ey], [x0 - nx - ex, y0 - ny - ey],
+    [x0 - nx * 0.4 - ex * 1.6, y0 - ny * 0.4 - ey * 1.6],
+    [x0 + nx * 0.4 - ex * 1.6, y0 + ny * 0.4 - ey * 1.6],
+  ];
+}
+
+/** Fan of tusks behind the roof. Same crescent as the slashes, so they taper. */
+function tusks(cx, y, r) {
+  const out = [];
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const spread = 0.4 + i * 0.34;
+      const from = [cx + side * r * spread * 0.45, y + r * 0.15];
+      const ctrl = [cx + side * r * spread * 1.45, y - r * 0.45];
+      const to = [cx + side * r * (0.35 + spread * 0.72), y - r * (1.3 - i * 0.14)];
+      out.push(crescent(quad(from, ctrl, to), r * (0.3 - i * 0.05), 1, 20));
+    }
+  }
+  // the small paired horns on the ridge itself
+  for (const side of [-1, 1]) {
+    out.push(crescent(quad([cx + side * r * 0.06, y], [cx + side * r * 0.2, y - r * 0.2], [cx + side * r * 0.26, y - r * 0.42]), r * 0.07, 1, 10));
+  }
+  return out;
+}
+
+/**
+ * Dark opening in the facade, ringed by teeth. `teeth` fills in the pale bone
+ * colour, `dark` in the cut-out colour.
+ */
+function mouth(cx, cy, w, h) {
+  const dark = [[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2]];
+  const teeth = [];
+  const n = 7;
+  const step = w / n;
+  for (let i = 0; i < n; i++) {
+    const x = cx - w / 2 + (i + 0.5) * step;
+    const tw = step * 0.44;
+    const len = h * (i === 0 || i === n - 1 ? 0.24 : 0.34);
+    teeth.push([[x - tw, cy - h / 2 - 2], [x + tw, cy - h / 2 - 2], [x, cy - h / 2 + len]]);
+    teeth.push([[x - tw, cy + h / 2 + 2], [x + tw, cy + h / 2 + 2], [x, cy + h / 2 - len]]);
+  }
+  return { dark, teeth };
+}
+
 /** Builds the three paper layers: far pavilion, flanking towers, near pillars. */
 function buildPavilion(rng, W, H) {
   const base = H * 0.8;
@@ -45,7 +120,7 @@ function buildPavilion(rng, W, H) {
   const cx = W / 2;
   far.push(rect(cx - W * 0.47, base - 22, W * 0.94, 26));
   let y = base - 22;
-  // Tall, wide-eaved tiers so the roofs reach past a performer's head and shoulders.
+  // wide eaves so the roofs clear a performer's head and shoulders
   const tiers = [
     { bw: W * 0.7, bh: H * 0.12, rw: W * 0.64, rh: H * 0.075 },
     { bw: W * 0.52, bh: H * 0.1, rw: W * 0.55, rh: H * 0.065 },
@@ -58,9 +133,19 @@ function buildPavilion(rng, W, H) {
     far.push(roof(cx, y, tier.rw, tier.rh, 16));
     y -= tier.rh * 0.75;
   }
-  far.push([[cx - 5, y + 6], [cx + 5, y + 6], [cx + 2, y - H * 0.06], [cx - 2, y - H * 0.06]]);
+  // bone parts fill pale so they read against the sky
+  const crownBones = tusks(cx, y + H * 0.02, H * 0.14);
+  const jaws = mouth(cx, base - H * 0.3, W * 0.3, H * 0.13);
+  const farBones = [...jaws.teeth];
+  // colonnade of bone pillars under the lowest roof
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const x0 = cx + side * W * (0.2 + i * 0.07);
+      farBones.push(bone(x0, base - H * 0.3, x0 + side * 4, base - H * 0.1, 7));
+    }
+  }
   // window lattice cut-outs are drawn as darker bars on the far layer
-  const lattice = [];
+  const lattice = [jaws.dark];
   for (let i = 0; i < 9; i++) lattice.push(rect(cx - W * 0.28 + i * W * 0.07, base - 22 - H * 0.1, 5, H * 0.085));
 
   const mid = [];
@@ -76,6 +161,18 @@ function buildPavilion(rng, W, H) {
   // low fence
   for (let i = 0; i < 16; i++) mid.push(rect(W * 0.02 + i * W * 0.062, base - H * 0.045, 6, H * 0.045));
   mid.push(rect(0, base - H * 0.05, W, 7));
+  // bone pile banked against the shrine floor
+  const midBones = [];
+  for (let i = 0; i < 14; i++) {
+    const x = W * 0.04 + i * W * 0.068 + rng.normal() * 10;
+    const py = base - H * 0.012 + rng.normal() * 6;
+    midBones.push(ellipse(x, py, rng.range(26, 58), rng.range(7, 14), rng.range(-0.25, 0.25), 14));
+    if (rng.chance(0.55)) {
+      const len = rng.range(30, 70);
+      const a = rng.range(-0.4, 0.4);
+      midBones.push(bone(x - Math.cos(a) * len * 0.5, py - Math.sin(a) * len * 0.5 - 10, x + Math.cos(a) * len * 0.5, py + Math.sin(a) * len * 0.5 - 10, rng.range(3, 5.5)));
+    }
+  }
 
   const near = [];
   for (const side of [-1, 1]) {
@@ -95,9 +192,9 @@ function buildPavilion(rng, W, H) {
   return {
     base,
     layers: [
-      { polys: tear(far, 3.2), lattice: tear(lattice, 1.5), color: '#4a0b10', start: 0.38, dur: 0.55, sway: 0.004 },
-      { polys: tear(mid, 2.6), color: '#220608', start: 0.55, dur: 0.5, sway: 0.006 },
-      { polys: tear(near, 4), color: C.char, start: 0.72, dur: 0.45, sway: 0.0 },
+      { polys: tear(far, 1.1), backBones: tear(crownBones, 1), bones: tear(farBones, 1), lattice: tear(lattice, 0.8), color: '#3a070c', bone: '#cdbca6', edge: 0.6, start: 0.38, dur: 0.55, sway: 0.004 },
+      { polys: tear(mid, 1.3), bones: tear(midBones, 1.2), color: '#1b0406', bone: '#8d7f72', edge: 0.42, start: 0.55, dur: 0.5, sway: 0.006 },
+      { polys: tear(near, 4), color: C.char, edge: 0.3, start: 0.72, dur: 0.45, sway: 0.0 },
     ],
     tags,
   };
@@ -136,16 +233,26 @@ export default {
   palette: C,
 
   init(rng, { W, H, low }) {
-    const pav = buildPavilion(rng.fork('pavilion'), W, H);
+    // Waterline sits a bit above centre; the shrine stands on it and mirrors
+    // into it. Built against a virtual height so its proportions survive any
+    // stage shape, while sky, ink, slashes and ash use the real frame.
+    const floorY = H * 0.56;
+    const Hv = floorY / 0.8;
+    // wide enough that the roofs and tusks reach past the performer rather than
+    // hiding behind them
+    const sceneW = Math.min(W * 0.95, Math.max(Hv * 1.1, W * 0.62));
+    const pav = buildPavilion(rng.fork('pavilion'), sceneW, Hv);
+    pav.sceneW = sceneW;
+    pav.ox = (W - sceneW) / 2;
     const inkRng = rng.fork('ink');
-    const blobs = Array.from({ length: low ? 26 : 46 }, () => {
-      const x = W / 2 + inkRng.normal() * W * 0.33;
-      const y = H * 0.86 + inkRng.normal() * H * 0.045;
-      const rx = inkRng.range(40, 150);
-      return { x, y, rx, ry: rx * inkRng.range(0.22, 0.34), at: 0.22 + (Math.abs(x - W / 2) / W) * 0.9 + inkRng.range(0, 0.18) };
+    const blobs = Array.from({ length: low ? 14 : 26 }, () => {
+      const x = W / 2 + inkRng.normal() * W * 0.3;
+      const y = pav.base + inkRng.normal() * H * 0.02;
+      const rx = inkRng.range(30, 95);
+      return { x, y, rx, ry: rx * inkRng.range(0.09, 0.17), at: 0.22 + (Math.abs(x - W / 2) / W) * 0.9 + inkRng.range(0, 0.18) };
     });
     const slashRng = rng.fork('slash');
-    const nSlash = low ? 7 : 12;
+    const nSlash = low ? 5 : 8;
     const slashes = Array.from({ length: nSlash }, (_, i) => {
       const t0 = 1.35 + i * (4.0 / nSlash) + slashRng.range(-0.08, 0.08);
       const fromLeft = slashRng.chance(0.5);
@@ -194,44 +301,43 @@ export default {
     g.restore();
   },
 
-  render(g, s, f) {
-    const { W, H, t, ph } = f;
-    const mid = f.a ? f.a.mid : [W / 2, H * 0.55];
-    const world = ph.world;
-    const fold = 1 - ease.inOut(ph.dissolve);
-
-    f.room.draw(g, {});
-    if (world > 0) {
-      g.save();
-      g.globalAlpha = world;
-      const bg = g.createLinearGradient(0, 0, 0, H);
-      // a glowing backdrop so the paper layers read as cut-out silhouettes
-      bg.addColorStop(0, '#1a0405');
-      bg.addColorStop(0.35, '#5a1208');
-      bg.addColorStop(0.62, '#b8360f');
-      bg.addColorStop(0.8, '#3a0b07');
-      bg.addColorStop(1, '#080303');
-      g.fillStyle = bg;
-      g.fillRect(0, 0, W, H);
-      glow(g, W / 2, s.pav.base - H * 0.3, W * 0.95, '#ff7a2a', 0.38 * (0.85 + 0.15 * Math.sin(t * 1.3)));
-      g.restore();
-    }
-
-    // Paper pavilion: three layers unfold upward from the floor line, staggered.
+  /**
+   * Three paper layers unfolding from the floor line, plus the tags and the
+   * lantern glow. Called twice: once upright, once flipped into the water.
+   */
+  structure(g, s, f, fold, world) {
     const reducedStretch = f.reduced ? 1.6 : 1;
+    const { t, H } = f;
+    const SW = s.pav.sceneW;
+    g.save();
+    g.translate(s.pav.ox, 0);
     s.pav.layers.forEach((layer, i) => {
       const up = range01(t, layer.start * reducedStretch, (layer.start + layer.dur) * reducedStretch);
       const k = (f.reduced ? ease.inOutSine(up) : ease.outBack(up)) * (i === 2 ? fold : clamp01(fold * 1.15 - i * 0.08));
       if (k <= 0.001) return;
       g.save();
-      g.translate(W / 2, s.pav.base);
+      g.translate(SW / 2, s.pav.base);
       g.transform(1, 0, Math.sin(t * 0.7 + i) * layer.sway, 1, 0, 0);
       g.scale(1, k);
-      g.translate(-W / 2, -s.pav.base);
+      g.translate(-SW / 2, -s.pav.base);
+      if (layer.backBones) {
+        g.fillStyle = layer.bone;
+        for (const poly of layer.backBones) {
+          polygon(g, poly);
+          g.fill();
+        }
+      }
       g.fillStyle = layer.color;
       for (const poly of layer.polys) {
         polygon(g, poly);
         g.fill();
+      }
+      if (layer.bones) {
+        g.fillStyle = layer.bone;
+        for (const poly of layer.bones) {
+          polygon(g, poly);
+          g.fill();
+        }
       }
       if (layer.lattice) {
         g.fillStyle = '#1c0507';
@@ -240,19 +346,25 @@ export default {
           g.fill();
         }
       }
-      // paper edge highlight on the far layer
-      if (i === 0) {
-        g.strokeStyle = rgba(C.emberHi, 0.22);
-        g.lineWidth = 1;
+      // edge glow on the eaves, or the architecture vanishes into the dark sky
+      if (layer.edge) {
+        g.save();
+        g.strokeStyle = rgba(C.ember, layer.edge);
+        g.lineWidth = i === 0 ? 2.2 : 1.4;
+        if (!f.low) {
+          g.shadowColor = rgba(C.emberHi, 0.9);
+          g.shadowBlur = 14;
+        }
         for (const poly of layer.polys) {
           polygon(g, poly);
           g.stroke();
         }
+        g.restore();
       }
       g.restore();
     });
 
-    // Hanging paper tags (mid layer timing).
+    // tags come in on the mid layer's timing
     const tagK = range01(t, 0.8, 1.3) * fold;
     if (tagK > 0) {
       g.save();
@@ -274,15 +386,111 @@ export default {
     // Lanterns glow slowly (no strobe).
     if (world > 0.2) {
       for (const side of [-1, 1]) {
-        for (const yy of [0.34, 0.2]) glow(g, W / 2 + side * W * 0.4, s.pav.base - H * yy, 34, C.ember, 0.4 * world * (0.75 + 0.25 * Math.sin(t * 1.1 + side + yy * 9)));
+        for (const yy of [0.34, 0.2]) glow(g, SW / 2 + side * SW * 0.4, s.pav.base - H * yy, 34, C.ember, 0.4 * world * (0.75 + 0.25 * Math.sin(t * 1.1 + side + yy * 9)));
       }
     }
+    g.restore();
 
-    // Slashes and the torn gashes they leave, behind the performer.
+  },
+
+  render(g, s, f) {
+    const { W, H, t, ph } = f;
+    const mid = f.a ? f.a.mid : [W / 2, H * 0.55];
+    const world = ph.world;
+    const fold = 1 - ease.inOut(ph.dissolve);
+
+    f.room.draw(g, {});
+    // A loaded clip replaces the painted sky, water and shrine. Slashes, ash
+    // and hand effects still draw live on top.
+    const clipped = world > 0 && f.clip && drawClipCover(g, f.clip, W, H);
+    if (world > 0 && !clipped) {
+      g.save();
+      g.globalAlpha = world;
+      const bg = g.createLinearGradient(0, 0, 0, H);
+      // a glowing backdrop so the paper layers read as cut-out silhouettes
+      bg.addColorStop(0, '#2b0406');
+      bg.addColorStop(0.18, '#7d150a');
+      bg.addColorStop(0.36, '#c23c10');
+      bg.addColorStop(0.52, '#4d0d07');
+      bg.addColorStop(0.58, '#0b0406');
+      bg.addColorStop(1, '#04080a');
+      g.fillStyle = bg;
+      g.fillRect(0, 0, W, H);
+      glow(g, W / 2, s.pav.base - H * 0.22, W * 0.8, '#ff7a2a', 0.42 * (0.85 + 0.15 * Math.sin(t * 1.3)));
+      // mist sitting on the water, which hides the seam between the two halves
+      const mist = g.createLinearGradient(0, s.pav.base - H * 0.06, 0, s.pav.base + H * 0.07);
+      mist.addColorStop(0, 'rgba(10,14,16,0)');
+      mist.addColorStop(0.5, 'rgba(120,160,170,0.22)');
+      mist.addColorStop(1, 'rgba(10,14,16,0)');
+      g.fillStyle = mist;
+      g.fillRect(0, s.pav.base - H * 0.06, W, H * 0.13);
+      g.restore();
+    }
+
+    // The whole world creeps toward the camera for the length of the cast, so
+    // the sustained phase never freezes.
+    const base = s.pav.base;
+    const push = 1 + 0.07 * ease.outCubic(clamp01(t / 6.5));
+    if (!clipped) {
+    g.save();
+    g.translate(W / 2, base);
+    g.scale(push, push);
+    g.translate(-W / 2, -base);
+    if (world > 0) {
+      g.save();
+      g.globalAlpha = world;
+      const water = g.createLinearGradient(0, base, 0, H);
+      water.addColorStop(0, '#0a1416');
+      water.addColorStop(0.45, '#0d2a2f');
+      water.addColorStop(1, '#061013');
+      g.fillStyle = water;
+      g.fillRect(0, base, W, H - base);
+      // tiles running away from the camera
+      g.strokeStyle = rgba('#5fe6ff', 0.14);
+      g.lineWidth = 1;
+      g.beginPath();
+      for (let i = 1; i < 9; i++) {
+        const y = base + ((H - base) * i * i) / 81;
+        g.moveTo(0, y);
+        g.lineTo(W, y);
+      }
+      for (let i = -6; i <= 6; i++) {
+        g.moveTo(W / 2 + i * W * 0.08, base);
+        g.lineTo(W / 2 + i * W * 0.42, H);
+      }
+      g.stroke();
+      glow(g, W / 2, H, W * 0.8, '#2fd9ff', 0.22 * world);
+      g.restore();
+
+      // the reflection: flipped, dimmed, and cooled by the water
+      g.save();
+      g.beginPath();
+      g.rect(0, base, W, H - base);
+      g.clip();
+      g.globalAlpha = 0.4 * world;
+      g.translate(0, base * 2);
+      g.scale(1, -1);
+      this.structure(g, s, f, fold, world);
+      g.restore();
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.fillStyle = rgba('#1d7f94', 0.1 * world);
+      g.fillRect(0, base, W, H - base);
+      g.restore();
+    }
+
+    this.structure(g, s, f, fold, world);
+    g.restore();
+    }
+
+    // Slashes and the gashes they leave, behind the performer. They play
+    // quieter over a clip backdrop, which brings its own smoke and embers; at
+    // full strength they bury the architecture they are meant to cut across.
+    const quiet = clipped ? 0.45 : 1;
     for (const sl of s.slashes) {
       const tt = t - sl.t0;
       if (tt < 0) continue;
-      const tearA = clamp01(tt / 0.12) * (1 - range01(tt, 1.6, 3.4)) * fold;
+      const tearA = clamp01(tt / 0.12) * (1 - range01(tt, 1.6, 3.4)) * fold * quiet;
       if (tearA > 0) {
         g.save();
         g.globalAlpha = tearA;
@@ -303,7 +511,7 @@ export default {
       if (fade > 0 && sweep > 0) {
         const poly = crescent(quad(sl.p0, sl.p1, sl.p2), sl.w, sweep);
         g.save();
-        g.globalAlpha = fade * (f.reduced ? 0.7 : 1);
+        g.globalAlpha = fade * (f.reduced ? 0.7 : 1) * quiet;
         g.shadowColor = 'rgba(255,60,40,0.9)';
         g.shadowBlur = f.low ? 0 : 18;
         g.fillStyle = C.crimson;
@@ -317,7 +525,7 @@ export default {
       }
     }
 
-    // Ink spilling across the floor, spreading outward from under the performer.
+    // ink spilling out across the floor from under the performer
     const spread = f.reduced ? 1.5 : 1;
     g.save();
     g.fillStyle = C.ink;
@@ -335,6 +543,7 @@ export default {
     this.ashLayer(g, s, f, false);
 
     // The performer (or the camera portal when segmentation is off).
+    if (f.particles) f.particles(g);
     if (f.person.available) {
       f.person.draw(g, { rim: 'rgba(255,96,48,0.85)', rimBlur: f.low ? 0 : 18, grade: '#8a1410', gradeAlpha: 0.16 * world });
     } else if (world > 0) {
@@ -343,7 +552,7 @@ export default {
 
     this.ashLayer(g, s, f, true);
 
-    // Ember at the two-hand midpoint (0-0.4 s) with rising sparks.
+    // ember at the two-hand midpoint for the first 0.6 s, with rising sparks
     if (t < 0.6) {
       const k = 1 - range01(t, 0.35, 0.6);
       glow(g, mid[0], mid[1], 30 + 60 * ease.outCubic(range01(t, 0, 0.25)), C.ember, 0.75 * k);
@@ -359,18 +568,22 @@ export default {
       g.restore();
     }
 
-    this.title(g, s, f);
   },
 
   ashLayer(g, s, f, front) {
     const { t, W, H } = f;
+    // a clip backdrop brings its own embers, so dial this right down
+    const quiet = f.clip ? 0.3 : 1;
     g.save();
+    let i = 0;
     for (const a of s.ash) {
       if (a.front !== front) continue;
+      // and thin the field by half
+      if (f.clip && i++ % 2) continue;
       const tt = t - a.born;
       if (tt < 0 || tt > a.life) continue;
       const life = tt / a.life;
-      const alpha = Math.sin(Math.PI * life) * (front ? 0.45 : 0.8) * (1 - f.ph.dissolve);
+      const alpha = Math.sin(Math.PI * life) * (front ? 0.45 : 0.8) * (1 - f.ph.dissolve) * quiet;
       if (alpha <= 0) continue;
       const x = a.x + a.vx * tt + Math.sin(a.wob + tt * 2.2) * 10;
       const y = a.y + a.vy * tt;
@@ -427,7 +640,7 @@ export default {
     }
     g.font = `500 13px ${FONTS.mono}`;
     g.fillStyle = rgba(C.oxDeep, 0.85);
-    drawTracked(g, 'permit hrd-02 · filed in ink', 0, phh / 2 - 18, 1.2, 'center');
+    drawTracked(g, 'permit hrd-02 · filed in ink · @hollynst', 0, phh / 2 - 18, 1.2, 'center');
     g.restore();
   },
 };

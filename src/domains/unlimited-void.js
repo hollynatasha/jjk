@@ -1,18 +1,28 @@
-// Gojo / Unlimited Void. Original procedural art: a spark between the index
-// and middle fingertips, a 200 ms freeze of the room, a thin white ring that
-// races out from the hand, then a deep ultramarine "information ocean" of
-// parallax rings, invented glyph marks and slow stars behind the performer.
+// Gojo / Unlimited Void. Drawn in code, nothing traced from the anime.
+// Order of events: spark between the index and middle tips, 200 ms freeze of
+// the room, white ring out from the hand, then the blue space behind the
+// performer (parallax rings, glyph marks, slow stars).
 
 import { TAU, glow, rgba, ease, range01, clamp01, lerp, sparkPath, drawTracked, fitFont, FONTS, polyline } from '../render/draw.js';
+import { drawClipCover } from '../media/clips.js';
 
 const C = {
-  deep: '#01030c',
+  deep: '#01020a',
   navy: '#050c38',
   ultra: '#0c1f7a',
   ultraHi: '#1d3bb8',
   ice: '#cfe8ff',
   pale: '#9fd0ff',
   white: '#f4f9ff',
+  // the streak tunnel
+  hot: '#ff2f6a',
+  violet: '#6a2cff',
+  lilac: '#d7c4ff',
+  // the eye
+  gold: '#f2e39a',
+  jade: '#b8f5c8',
+  cyan: '#7fdcff',
+  iris: '#dfe3e6',
 };
 
 const GLYPH_KINDS = ['ring', 'dot', 'hbar', 'vbar', 'hook', 'tick', 'bracket', 'tri', 'cross'];
@@ -106,7 +116,7 @@ export default {
   init(rng, { W, H, low }) {
     const nStars = low ? 220 : 560;
     const nRings = low ? 22 : 40;
-    const nGlyphs = low ? 30 : 72;
+    const nGlyphs = low ? 18 : 40;
     const stars = Array.from({ length: nStars }, () => ({
       x: rng.range(-0.1, 1.1) * W,
       y: rng.range(-0.1, 1.1) * H,
@@ -140,6 +150,26 @@ export default {
       ops: makeGlyph(rng),
     }));
     const rays = Array.from({ length: low ? 14 : 28 }, () => ({ ang: rng.range(0, TAU), len: rng.range(0.55, 1), w: rng.range(0.012, 0.04), a: rng.range(0.25, 1) }));
+    // glyph columns pouring down the frame
+    const streams = Array.from({ length: low ? 7 : 14 }, () => ({
+      x: rng.range(0.02, 0.98),
+      d: rng.range(0.25, 1),
+      sp: rng.range(24, 90),
+      gap: rng.range(24, 48),
+      size: rng.range(5, 11),
+      a: rng.range(0.45, 1),
+      off: rng.range(0, 1),
+      ops: Array.from({ length: 8 }, () => makeGlyph(rng)),
+    }));
+    // concentric tick rings behind the performer, reads like a slow dial
+    const mandala = Array.from({ length: 3 }, (_, i) => ({
+      r: 0.17 + i * 0.08,
+      ticks: 24 + i * 18,
+      len: rng.range(0.012, 0.026),
+      spin: (i % 2 ? -1 : 1) * rng.range(0.03, 0.08),
+      a: rng.range(0.22, 0.4),
+      w: rng.range(0.8, 1.6),
+    }));
     const currents = Array.from({ length: low ? 6 : 14 }, () => ({
       y: rng.range(0.56, 0.98),
       amp: rng.range(6, 22),
@@ -148,10 +178,55 @@ export default {
       sp: rng.range(0.2, 0.6),
       a: rng.range(0.08, 0.22),
     }));
-    return { stars, rings, glyphs, rays, currents, sparkSeed: rng.int(1, 1e9) };
+    // the tunnel the domain opens as: streaks racing out of the centre
+    const streakRng = rng.fork('streaks');
+    const streaks = Array.from({ length: low ? 90 : 190 }, () => ({
+      ang: streakRng.range(0, TAU),
+      r0: streakRng.range(0, 0.22),
+      len: streakRng.range(0.35, 1.15),
+      w: streakRng.range(1, 6),
+      sp: streakRng.range(0.16, 0.6),
+      hue: streakRng.pick(['hot', 'violet', 'lilac', 'white']),
+      a: streakRng.range(0.35, 1),
+      off: streakRng.range(0, 1),
+    }));
+    const nebRng = rng.fork('nebula');
+    const nebula = Array.from({ length: low ? 10 : 20 }, () => ({
+      x: nebRng.range(-0.1, 1.1),
+      y: nebRng.range(0.38, 0.62),
+      r: nebRng.range(0.07, 0.26),
+      a: nebRng.range(0.12, 0.42),
+      sp: nebRng.range(-0.012, 0.012),
+      warm: nebRng.chance(0.25),
+    }));
+    const clouds = Array.from({ length: low ? 4 : 8 }, () => ({
+      x: nebRng.range(-0.15, 1.15),
+      y: nebRng.range(0.3, 0.95),
+      r: nebRng.range(0.1, 0.3),
+      a: nebRng.range(0.1, 0.3),
+      sp: nebRng.range(-0.02, 0.02),
+    }));
+    const eyeRng = rng.fork('eye');
+    const eyeArcs = Array.from({ length: 7 }, (_, i) => ({
+      r: 0.82 + i * 0.045 + eyeRng.range(-0.015, 0.015),
+      from: eyeRng.range(0, TAU),
+      span: eyeRng.range(1.2, 5.6),
+      w: eyeRng.range(1.5, 7),
+      spin: eyeRng.range(-0.18, 0.18),
+      tone: eyeRng.pick(['gold', 'jade', 'cyan', 'white']),
+      a: eyeRng.range(0.4, 1),
+    }));
+    const fibres = Array.from({ length: low ? 40 : 90 }, () => ({
+      ang: eyeRng.range(0, TAU),
+      r0: eyeRng.range(0.42, 0.56),
+      len: eyeRng.range(0.08, 0.3),
+      w: eyeRng.range(0.6, 2.4),
+      a: eyeRng.range(0.1, 0.5),
+    }));
+    return { stars, rings, glyphs, rays, currents, streams, mandala, streaks, nebula, clouds, eyeArcs, fibres, sparkSeed: rng.int(1, 1e9) };
   },
 
-  /** Pre-trigger charging cue at the fingertips. */
+  // charging cue at the fingertips, before the trigger
   charge(g, f, p, sec) {
     const a = f.a;
     if (!a) return;
@@ -194,7 +269,7 @@ export default {
     const worldC = closing ? anchor : start;
     const worldFull = ringP >= 1 && !closing;
 
-    // 1. The room: live, frozen for ~200 ms, then live again outside the ring.
+    // the room runs live, freezes for ~200 ms, then runs again outside the ring
     if (!worldFull) {
       const frozen = t >= FREEZE[0] && t < FREEZE[1];
       f.room.draw(g, { frozen });
@@ -210,7 +285,6 @@ export default {
       }
     }
 
-    // 2. The world, revealed inside the ring.
     if (worldR > 1) {
       g.save();
       if (!worldFull) {
@@ -219,6 +293,7 @@ export default {
         g.clip();
       }
       this.world(g, s, f, anchor, start);
+      if (f.particles) f.particles(g);
       if (f.person.available) {
         f.person.silhouette(g, { delayMs: 420, color: '#6fa8ff', alpha: 0.26, dx: 12, dy: -6, scale: 1.015 });
         f.person.draw(g, { rim: 'rgba(175,225,255,0.95)', rimBlur: f.low ? 0 : 22, grade: '#2a4fd6', gradeAlpha: 0.14 });
@@ -234,7 +309,6 @@ export default {
       g.restore();
     }
 
-    // 3. The ring itself.
     if (ringP > 0 && ringP < 1 && !closing) {
       g.save();
       g.strokeStyle = rgba(C.white, reduced ? 0.55 : 0.95);
@@ -256,7 +330,7 @@ export default {
       g.restore();
     }
 
-    // 4. Spark jumping between the fingertips (0-0.25 s).
+    // spark jumping between the fingertips, 0 to 0.25 s then it fades out
     if (t < 0.32 && f.a) {
       const [t8, t12] = f.a.tips;
       const k = 1 - range01(t, 0.22, 0.32);
@@ -274,102 +348,166 @@ export default {
       g.restore();
     }
 
-    this.title(g, f);
   },
 
+  // Two acts on one clock: the streak tunnel first, then the eye opening over
+  // it. Radii all come off the short side so it survives both stage shapes.
   world(g, s, f, anchor, start) {
     const { W, H, t, ph } = f;
+    const R = Math.min(W, H);
     const dx = anchor[0] - start[0];
     const dy = anchor[1] - start[1];
-    const vp = [W * 0.5 + dx * 0.12, H * 0.38 + dy * 0.08];
+    const c = (f.person && f.person.center) || [W * 0.5 + dx * 0.12, H * 0.42 + dy * 0.08];
     const fade = ph.world > 0 ? 0.25 + 0.75 * ph.world : 0.25;
-    const bg = g.createRadialGradient(vp[0], vp[1], 0, vp[0], vp[1], H * 0.95);
-    bg.addColorStop(0, C.ultraHi);
-    bg.addColorStop(0.18, C.ultra);
-    bg.addColorStop(0.55, C.navy);
-    bg.addColorStop(1, C.deep);
-    g.fillStyle = bg;
+    // eye takes over the second half of the sustained phase
+    const eye = clamp01((t - 2.9) / 1.5);
+    const tunnel = 1 - 0.75 * eye;
+
+    // if a pre-rendered backdrop loaded, it replaces everything below;
+    // the person and foreground still draw live over it back in render()
+    if (f.clip && drawClipCover(g, f.clip, W, H)) return;
+
+    g.fillStyle = C.deep;
     g.fillRect(0, 0, W, H);
+    glow(g, c[0], c[1], R * 0.75, '#1a2a22', 0.3 * fade);
+
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    for (const n of s.nebula) {
+      const x = (((n.x + n.sp * t) % 1.3) + 1.3) % 1.3 - 0.15;
+      glow(g, x * W + dx * 0.1, n.y * H, n.r * R, n.warm ? C.gold : C.cyan, n.a * fade * (0.45 + 0.55 * eye));
+    }
+    g.restore();
+
+    // the streak tunnel
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    g.lineCap = 'butt';
+    for (const st of s.streaks) {
+      const travel = ((st.off + t * st.sp) % 1.35) - 0.1;
+      const r0 = (st.r0 + travel) * R;
+      if (r0 < R * 0.03) continue;
+      const r1 = r0 + st.len * R * (0.4 + travel);
+      const cos = Math.cos(st.ang);
+      const sin = Math.sin(st.ang);
+      const a = st.a * fade * tunnel * clamp01(1.25 - travel) * clamp01(travel * 6);
+      if (a <= 0.01) continue;
+      g.strokeStyle = rgba(C[st.hue] || C.white, a);
+      g.lineWidth = st.w * (0.5 + travel);
+      g.beginPath();
+      g.moveTo(c[0] + cos * r0, c[1] + sin * r0);
+      g.lineTo(c[0] + cos * r1, c[1] + sin * r1);
+      g.stroke();
+    }
+    g.restore();
+
+    // the iris mechanism at the centre of the tunnel, before the eye opens
+    if (tunnel > 0.3) {
+      g.save();
+      g.translate(c[0], c[1]);
+      g.rotate(t * 0.12);
+      for (const m of s.mandala) {
+        const r = R * m.r * 0.75;
+        g.rotate(t * m.spin);
+        g.strokeStyle = rgba(C.lilac, m.a * fade * tunnel);
+        g.lineWidth = m.w;
+        g.beginPath();
+        g.arc(0, 0, r, 0, TAU);
+        g.stroke();
+        g.beginPath();
+        for (let i = 0; i < m.ticks; i++) {
+          const a = (i / m.ticks) * TAU;
+          g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+          g.lineTo(Math.cos(a) * (r + R * m.len), Math.sin(a) * (r + R * m.len));
+        }
+        g.stroke();
+      }
+      g.restore();
+    }
+
+    // the eye
+    if (eye > 0.001) {
+      const k = ease.outCubic(eye);
+      const rEye = R * 0.33 * k;
+      const rPupil = rEye * 0.44;
+      g.save();
+      glow(g, c[0], c[1], rEye * 1.9, C.jade, 0.3 * k * fade);
+      const ir = g.createRadialGradient(c[0], c[1], rPupil * 0.9, c[0], c[1], rEye);
+      ir.addColorStop(0, 'rgba(255,255,255,0.9)');
+      ir.addColorStop(0.45, 'rgba(190,196,200,0.5)');
+      ir.addColorStop(1, 'rgba(120,130,135,0.12)');
+      g.fillStyle = ir;
+      g.beginPath();
+      g.arc(c[0], c[1], rEye, 0, TAU);
+      g.fill();
+      // iris fibres
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      for (const fb of s.fibres) {
+        const a = fb.a * k * fade;
+        g.strokeStyle = rgba(C.iris, a);
+        g.lineWidth = fb.w;
+        const r0 = fb.r0 * rEye;
+        const r1 = r0 + fb.len * rEye;
+        const cos = Math.cos(fb.ang + t * 0.03);
+        const sin = Math.sin(fb.ang + t * 0.03);
+        g.beginPath();
+        g.moveTo(c[0] + cos * r0, c[1] + sin * r0);
+        g.lineTo(c[0] + cos * r1, c[1] + sin * r1);
+        g.stroke();
+      }
+      g.restore();
+      g.fillStyle = '#000';
+      g.beginPath();
+      g.arc(c[0], c[1], rPupil, 0, TAU);
+      g.fill();
+      // ringed arcs
+      g.save();
+      g.globalCompositeOperation = 'lighter';
+      g.lineCap = 'round';
+      for (const arc of s.eyeArcs) {
+        g.strokeStyle = rgba(C[arc.tone] || C.white, arc.a * k * fade * 0.85);
+        g.lineWidth = arc.w;
+        const from = arc.from + t * arc.spin;
+        g.beginPath();
+        g.arc(c[0], c[1], rEye * arc.r, from, from + arc.span);
+        g.stroke();
+      }
+      g.restore();
+      g.restore();
+    }
+
+    g.save();
+    for (const cl of s.clouds) {
+      const x = (((cl.x + cl.sp * t) % 1.4) + 1.4) % 1.4 - 0.2;
+      glow(g, x * W, cl.y * H, cl.r * R, C.white, cl.a * fade * (0.5 + 0.5 * eye));
+    }
+    g.restore();
+
+    // the information the domain buries you in, quieter than the tunnel
+    g.save();
+    g.globalAlpha = 0.3 + 0.2 * tunnel;
+    g.lineWidth = 1;
+    for (const st of s.streams) {
+      const x = st.x * W + dx * st.d * 0.3;
+      const scroll = (st.off * H + t * st.sp) % st.gap;
+      g.strokeStyle = rgba(C.ice, st.a * fade * (0.35 + 0.65 * st.d) * 0.6);
+      g.fillStyle = g.strokeStyle;
+      for (let i = 0, y = -st.gap + scroll; y < H + st.gap; i++, y += st.gap) {
+        g.save();
+        g.translate(x, y + dy * st.d * 0.3);
+        drawGlyph(g, st.ops[i % st.ops.length], st.size * (0.6 + st.d));
+        g.restore();
+      }
+    }
+    g.restore();
 
     // far stars, parallax with the hand
     g.fillStyle = C.ice;
     for (const st of s.stars) {
-      if (st.d >= 0.55) continue;
-      const a = (0.25 + 0.5 * (0.5 + 0.5 * Math.sin(st.ph + t * st.sp * TAU))) * fade;
+      const a = (0.2 + 0.4 * (0.5 + 0.5 * Math.sin(st.ph + t * st.sp * TAU))) * fade * (1 - 0.5 * eye);
       g.globalAlpha = a;
       g.fillRect(st.x + dx * st.d * 0.25, st.y + dy * st.d * 0.25, st.s, st.s);
-    }
-    g.globalAlpha = 1;
-
-    // radiant halo behind the performer, turning very slowly
-    const hc = f.person.center || [W / 2, H * 0.36];
-    const hr = H * 0.42;
-    glow(g, hc[0], hc[1], hr, '#6f9dff', 0.32 * fade);
-    g.save();
-    g.translate(hc[0], hc[1]);
-    g.rotate(t * 0.05);
-    for (const r of s.rays) {
-      g.fillStyle = rgba(C.ice, 0.05 * r.a * fade);
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.arc(0, 0, hr * r.len, r.ang - r.w, r.ang + r.w);
-      g.closePath();
-      g.fill();
-    }
-    g.restore();
-
-    // parallax rings receding to a vanishing point near the hand
-    const open = 0.55 + 0.45 * ease.outCubic(ph.rupture);
-    g.save();
-    for (const r of s.rings) {
-      const cx = vp[0] + r.ox * W + dx * r.d * 0.2;
-      const cy = vp[1] + r.oy * H + dy * r.d * 0.2;
-      const rx = r.r * open * (1 + 0.02 * Math.sin(t * 0.6 + r.rot));
-      g.strokeStyle = rgba(C.ice, r.a * fade);
-      g.lineWidth = r.w;
-      g.setLineDash(r.dash || []);
-      g.beginPath();
-      g.ellipse(cx, cy, rx, rx * r.tilt, r.rot + r.spin * t, 0, TAU);
-      g.stroke();
-    }
-    g.setLineDash([]);
-    g.restore();
-
-    // slow currents along the lower half
-    g.save();
-    g.lineWidth = 1;
-    for (const c of s.currents) {
-      g.strokeStyle = rgba(C.pale, c.a * fade);
-      g.setLineDash([2, 9]);
-      g.lineDashOffset = -t * 40 * c.sp;
-      g.beginPath();
-      const y0 = c.y * H;
-      for (let x = -20; x <= W + 20; x += 24) {
-        const y = y0 + Math.sin(x * c.freq + c.ph + t * c.sp) * c.amp;
-        if (x === -20) g.moveTo(x, y);
-        else g.lineTo(x, y);
-      }
-      g.stroke();
-    }
-    g.setLineDash([]);
-    g.restore();
-
-    // invented glyph marks drifting in depth
-    g.save();
-    g.lineWidth = 1;
-    for (const gl of s.glyphs) {
-      if (gl.d > 0.8) continue;
-      this.glyph(g, gl, t, dx, dy, fade, W, H);
-    }
-    g.restore();
-
-    // near stars
-    g.fillStyle = C.white;
-    for (const st of s.stars) {
-      if (st.d < 0.55) continue;
-      const a = (0.35 + 0.5 * (0.5 + 0.5 * Math.sin(st.ph + t * st.sp * TAU))) * fade;
-      g.globalAlpha = a;
-      g.fillRect(st.x + dx * st.d * 0.45, st.y + dy * st.d * 0.45, st.s * 1.2, st.s * 1.2);
     }
     g.globalAlpha = 1;
   },
@@ -420,12 +558,13 @@ export default {
     g.shadowBlur = 0;
     g.font = `500 15px ${FONTS.mono}`;
     g.fillStyle = rgba(C.ice, 0.75 * out * clamp01((t - t0 - 0.8) / 0.6));
-    drawTracked(g, 'domain permit hrd-01 · granted by the department', W / 2, H * 0.865 + 34, 1.5, 'center');
+    drawTracked(g, 'permit hrd-01 · granted by the department · @hollynst', W / 2, H * 0.865 + 34, 1.5, 'center');
     g.restore();
   },
 };
 
-// Tiny deterministic generator for animation jitter that must not consume the cast rng.
+// deterministic jitter for the animation. separate generator because it must not
+// consume the cast rng, that would shift every later draw.
 function makeLocalRng(seed) {
   let a = seed >>> 0 || 1;
   return {

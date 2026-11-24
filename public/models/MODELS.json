@@ -1,10 +1,16 @@
 {
   "hand_landmarker.task": {
-    "source": "https://github.com/google-ai-edge/mediapipe-samples/blob/9cabe32bfdd0a7457e2cb1d2f29ffcf7dc24195f/examples/hand_landmarker/ios/HandLandmarker/hand_landmarker.task",
-    "about": "MediaPipe Hand Landmarker model as bundled in Google's mediapipe-samples repository (Apache-2.0), copied unmodified. Contains hand_detector.tflite and hand_landmarks_detector.tflite dated 2023-04-26.",
+    "source": "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+    "about": "MediaPipe Hand Landmarker (float16, version 1), Apache-2.0",
     "bytes": 7819105,
     "sha256": "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1",
-    "officialUrl": "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-    "note": "Not byte-compared with the official file: this project's build sandbox could not download from storage.googleapis.com. Run `npm run fetch-models` to replace it with the official file and record that file's hash here."
+    "fetchedAt": "2026-10-12T15:04:01.026Z"
+  },
+  "selfie_segmenter.tflite": {
+    "source": "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite",
+    "about": "MediaPipe Selfie Segmenter (float16, latest), Apache-2.0",
+    "bytes": 249537,
+    "sha256": "191ac9529ae506ee0beefa6b2c945a172dab9d07d1e802a290a4e4038226658b",
+    "fetchedAt": "2026-10-12T15:04:04.635Z"
   }
 }

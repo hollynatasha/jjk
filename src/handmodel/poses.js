@@ -1,6 +1,6 @@
-// Joint-angle descriptions of the four taught signs, their camera-friendly
-// variants and a set of neutral poses. Used by unit-test fixtures, by the
-// simulation stand-in, and to draw the original pose-card line art.
+// Joint angles for the taught signs, their camera-friendly variants and some
+// neutral poses. Feeds the test fixtures, the simulation stand-in and the
+// pose-card line art.
 
 import { buildLocalHand, placeHand, rotatePoints, projectHand } from './synthetic.js';
 import { norm, mean } from '../core/vec.js';
@@ -33,8 +33,8 @@ const UP = [0, -1, 0];
 const TO_CAMERA = [0, 0, -1];
 const h = (chirality, pose, wrist, u, n) => ({ chirality, pose, wrist, u: norm(u), n: norm(n) });
 
-/** Camera-space scenes (metres, x right, y down, z away). Raw, unmirrored frame:
- * the performer's right hand sits on the image's left. */
+/** Camera-space scenes: metres, x right, y down, z away. Raw unmirrored frame,
+ * so the performer's right hand sits on the image's left. */
 export const SIGN_SCENES = {
   gojo: {
     canonical: [h('R', 'gojoCross', [-0.055, 0.035, 0.48], [0.05, -1, 0], [0.18, 0, -1])],
@@ -60,20 +60,9 @@ export const SIGN_SCENES = {
       h('L', 'megumiFriendly', [0.05, 0.075, 0.48], [-0.42, -0.9, 0], [-0.9, 0, -0.42]),
     ],
   },
-  higuruma: {
-    // Fan-made: upright oath palm + flat gavel hand below it.
-    canonical: [
-      h('R', 'flat', [-0.05, 0.0, 0.5], UP, TO_CAMERA),
-      h('L', 'flat', [0.07, 0.085, 0.5], [-1, 0, 0], [0, 1, 0]),
-    ],
-    friendly: [
-      h('R', 'flat', [-0.055, 0.0, 0.5], UP, TO_CAMERA),
-      h('L', 'flat', [0.075, 0.09, 0.5], [-1, 0, 0], [0, 1, 0]),
-    ],
-  },
 };
 
-/** Poses Holly might hold between signs. Used as negatives in tests. */
+/** Stuff my hands do between signs. Test negatives. */
 export const NEUTRAL_SCENES = {
   openR: [h('R', 'open', [-0.06, 0.03, 0.5], UP, TO_CAMERA)],
   openL: [h('L', 'open', [0.06, 0.03, 0.5], UP, TO_CAMERA)],
@@ -123,7 +112,7 @@ function jitterPose(pose, rng, sd) {
   return out;
 }
 
-/** Camera-space points for each hand in a scene, before projection. */
+/** camera-space points per hand, before projection */
 export function scenePoints(scene, { rng = null, view = 'center', noise = 1, yaw = 0, roll = 0, pitch = 0, scale = 1 } = {}) {
   const v = VIEW[view] || VIEW.center;
   const jy = rng ? rng.normal() * 3 * noise : 0;
@@ -139,20 +128,20 @@ export function scenePoints(scene, { rng = null, view = 'center', noise = 1, yaw
   return hands.map(({ chirality, pts }) => {
     let q = rotatePoints(pts, pivot, { yaw: v.yaw + jy + yaw, pitch: jp + pitch, roll: jr + roll });
     q = q.map(([x, y, z]) => [x + shift[0], y + shift[1], z]);
-    // Move the scene along the viewing ray to emulate distance.
+    // slide along the view ray to fake standing nearer or further back
     q = q.map(([x, y, z]) => [x * distMul, y * distMul, z * distMul]);
     return { chirality, pts: q };
   });
 }
 
 /**
- * A HandLandmarker-shaped frame for a scene. Output hand order is shuffled by
- * the rng to mimic MediaPipe's unstable ordering.
+ * A HandLandmarker-shaped frame for a scene. Hand order gets shuffled by the
+ * rng because MediaPipe's ordering is not stable either.
  */
 export function sceneFrame(scene, opts = {}) {
-  // `rng` drives the pose/view jitter of one attempt; `noiseRng` (defaults to
-  // rng) drives per-frame landmark noise, so several frames of one capture
-  // share a pose but not their noise.
+  // `rng` jitters the pose and view for one attempt. `noiseRng` (defaults to
+  // rng) does per-frame landmark noise, so frames from one capture can share a
+  // pose without sharing noise.
   const { rng = null, width = 640, height = 480, landmarkNoise = 0.0022, worldNoise = 0.0012 } = opts;
   const noiseRng = opts.noiseRng || rng;
   const hands = scenePoints(scene, opts).map(({ chirality, pts }) => {

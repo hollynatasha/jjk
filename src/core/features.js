@@ -1,6 +1,6 @@
-// Landmark-derived feature vectors. Nothing here sees pixels: the input is the
-// 21 landmarks per hand that HandLandmarker returns, and the output is a short
-// numeric vector. Only these vectors are ever stored.
+// Landmark-derived feature vectors. No pixels here: in go the 21 landmarks per
+// hand from HandLandmarker, out comes a short numeric vector. Only the vectors
+// are ever stored.
 //
 // Per hand (67 values, reflection-canonicalised into a right-hand frame):
 //   30  fingertip + PIP/IP positions in a palm frame (origin wrist, +y toward the
@@ -13,9 +13,8 @@
 // Two hands add 10 layout values (wrist spacing, offsets, fingertip contact,
 // relative tilt and depth) computed in raw image space.
 //
-// We never compute a "fingers crossed" flag. A 2D landmark model fills in a
-// fully hidden fingertip with a guess, so crossing is left to the learned
-// templates rather than inferred as a fact.
+// No "fingers crossed" flag anywhere. A 2D landmark model will happily invent
+// a fully hidden fingertip, so crossing is left to the learned templates.
 
 import { sub, cross, norm, dot, len, mean, angleBetween } from './vec.js';
 
@@ -58,9 +57,9 @@ export const WEIGHTS = {
 };
 
 /**
- * MediaPipe's handedness label assumes a mirrored selfie image. The app always
- * feeds raw, unmirrored camera frames, so "Left" means the performer's right
- * hand. Training and live matching use the same rule, which is what matters.
+ * MediaPipe's handedness label assumes a mirrored selfie image. We feed raw
+ * unmirrored frames, so "Left" means the performer's right hand. Training and
+ * live matching both go through here, so at least it's consistent.
  */
 export function chiralityFromLabel(label) {
   return label === 'Left' ? 'R' : 'L';
@@ -184,12 +183,10 @@ function concat(...arrs) {
 }
 
 /**
- * Features for one tracking frame.
- * Returns { count, variants, chirality?, info }.
- *  - one hand: a single variant; chirality comes from the handedness label
- *    and feeds the handedness gate.
- *  - two hands: two variants, one per hand-to-role assignment, so a label or
- *    ordering swap from the tracker still matches the taught template.
+ * One tracking frame in, { count, variants, chirality?, info } out. One hand
+ * gives one variant plus the chirality the handedness gate needs. Two hands
+ * give two variants, one per hand-to-role assignment, so a label or ordering
+ * swap out of the tracker still matches the taught template.
  */
 export function extractFrameFeatures(frame) {
   const W = frame.width || 640;

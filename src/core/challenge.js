@@ -1,6 +1,6 @@
 // "Test my signs": five attempts per trained sign in random order, with rest
-// phases in between where any cast counts as a false positive. A sign earns
-// its green "ready" badge only from this webcam challenge.
+// phases in between where any cast counts as a false positive. The green
+// "ready" badge comes only from here.
 
 import { CastGate } from './gate.js';
 import { makeRng } from './rng.js';
@@ -19,12 +19,22 @@ export class SignChallenge {
     this.opts = { ...CHALLENGE_DEFAULTS, ...options };
     this.domains = domains.slice();
     const rng = makeRng(seed);
-    // Random order, but avoid asking for the same sign twice in a row when possible.
-    let order = [];
-    for (let i = 0; i < this.opts.trialsPerSign; i++) order.push(...this.domains);
-    for (let attempt = 0; attempt < 20; attempt++) {
-      order = rng.shuffle(order);
-      if (this.domains.length < 2 || order.every((d, i) => i === 0 || d !== order[i - 1])) break;
+    // Random order, never the same sign twice in a row. Reshuffling until that
+    // happens by chance gets unreliable with few signs, so instead take the
+    // sign with the most trials left that isn't the one just asked, ties broken
+    // by the seeded shuffle.
+    const left = new Map(this.domains.map((d) => [d, this.opts.trialsPerSign]));
+    const order = [];
+    const total = this.domains.length * this.opts.trialsPerSign;
+    let prev = null;
+    for (let i = 0; i < total; i++) {
+      const pool = rng.shuffle(this.domains.filter((d) => left.get(d) > 0 && (d !== prev || this.domains.length === 1)));
+      if (!pool.length) break;
+      let pick = pool[0];
+      for (const d of pool) if (left.get(d) > left.get(pick)) pick = d;
+      order.push(pick);
+      left.set(pick, left.get(pick) - 1);
+      prev = pick;
     }
     this.order = order;
     this.gate = new CastGate({ ...gateOptions, cooldownMs: 0 });
@@ -90,8 +100,8 @@ export class SignChallenge {
       this.records.push(event);
       this.phase = 'feedback';
       this.phaseStart = now;
-      // A hold still building when time ran out must not complete during the
-      // pause and be counted as a false positive: the sign has to be released first.
+      // a hold still building when time ran out must not complete during the
+      // pause and score as a false positive, so require a release first
       this.gate.unlock(now, { requireRelease: true });
     } else if (this.phase === 'feedback' && elapsed >= this.opts.feedbackMs) {
       this.index += 1;
@@ -124,7 +134,7 @@ export class SignChallenge {
     for (const d of this.domains) {
       const s = perSign[d];
       const confusionCount = Object.values(s.confusions).reduce((a, b) => a + b, 0);
-      // Being cast when another sign was asked for also counts against a sign.
+      // being cast when another sign was asked for counts against a sign too
       const castByMistake = this.records.filter((r) => r.type === 'confusion' && r.detected === d).length;
       ready[d] = s.success >= this.opts.readyMinSuccess && confusionCount === 0 && castByMistake === 0 && s.falsePositives <= this.opts.maxFalsePositives;
       s.castByMistake = castByMistake;

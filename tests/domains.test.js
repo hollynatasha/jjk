@@ -10,9 +10,9 @@ import { frameFor, SIGN_SCENES } from './fixtures/hands.js';
 
 const W = 720;
 const H = 1280;
-const IDS = ['gojo', 'sukuna', 'megumi', 'higuruma'];
+const IDS = ['gojo', 'sukuna', 'megumi'];
 
-/** A 2D context that records every call and property write, with numbers rounded. */
+/** 2D context that logs every call and property write, numbers rounded. */
 function recordingContext() {
   const log = [];
   const props = { globalAlpha: 1, lineWidth: 1, font: '10px sans-serif', globalCompositeOperation: 'source-over', shadowBlur: 0 };
@@ -54,7 +54,7 @@ function handsFor(domain, seed = 7) {
   return handsToCanvas(frameFor(SIGN_SCENES[domain].friendly, seed), VIEW);
 }
 
-/** Renders a cast at the given times into a fresh recording context; returns the call log. */
+/** Renders a cast at the given times, returns the call log from a fresh context. */
 function renderCast(domain, { seed = 1234, times = [0.1, 0.8, 3.0, 6.5], reduced = false, low = false, person = true } = {}) {
   const mod = moduleFor(domain);
   const a = anchorsFromHands(handsFor(domain));
@@ -76,6 +76,7 @@ function renderCast(domain, { seed = 1234, times = [0.1, 0.8, 3.0, 6.5], reduced
       room: { draw: (gg) => gg.note('room') },
       person: { available: person, center: [W / 2, H * 0.45], draw: (gg) => gg.note('person'), silhouette: (gg) => gg.note('silhouette') },
       portalRoom: (gg) => gg.note('portal'),
+      particles: (gg) => gg.note('particles'),
       temp: (i) => (temps[i] = temps[i] || tempCanvas()),
       overlay: !person,
     };
@@ -87,10 +88,10 @@ function renderCast(domain, { seed = 1234, times = [0.1, 0.8, 3.0, 6.5], reduced
 const signature = (log) => JSON.stringify(log);
 
 describe('domain registry', () => {
-  it('has exactly the four taught domains, each with its own animation', () => {
+  it('has exactly the taught domains, each with its own animation', () => {
     expect(Object.keys(DOMAIN_MODULES).sort()).toEqual([...IDS].sort());
     const anims = IDS.map((d) => moduleFor(d).id);
-    expect(new Set(anims).size).toBe(4);
+    expect(new Set(anims).size).toBe(IDS.length);
     for (const d of DOMAINS) {
       expect(moduleFor(d.id).id).toBe(d.animationId);
       expect(moduleFor(d.id).domain).toBe(d.id);
@@ -116,7 +117,7 @@ describe('domain choreography', () => {
 
   it('gives every domain its own drawing (no two call logs alike)', () => {
     const sigs = IDS.map((d) => signature(logs[d]));
-    expect(new Set(sigs).size).toBe(4);
+    expect(new Set(sigs).size).toBe(IDS.length);
     // and their colour sets differ, not just their coordinates
     const colours = (log) => new Set(log.filter((c) => c[0] === '=fillStyle' || c[0] === '=strokeStyle' || c[0] === 'stop').map((c) => c[c.length - 1]).filter((x) => typeof x === 'string' && /^#|^rgb/.test(x)));
     for (let i = 0; i < IDS.length; i++) {

@@ -1,8 +1,7 @@
-// Records the composited 9:16 canvas (plus the synthesized sound) with
-// MediaRecorder. The extension always follows the real container: a WebM file
-// is never called .mp4.
+// MediaRecorder over the composited 9:16 canvas plus the synthesized sound.
+// The extension follows the real container, so a WebM is never called .mp4.
 
-// H.264 MP4 first (plays everywhere, uploads to Reels); then WebM. A bare
+// H.264 MP4 first (plays everywhere, uploads to Reels), then WebM. A bare
 // "video/mp4" comes last because some Chromium builds fill it with VP9, which
 // many players and upload pages reject inside an MP4.
 const CANDIDATES = [
@@ -125,7 +124,7 @@ export class ClipRecorder {
   }
 }
 
-/** Saves a blob locally and revokes the temporary URL afterwards. */
+/** Saves a blob locally, then revokes the temporary URL. */
 export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

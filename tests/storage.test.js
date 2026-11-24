@@ -36,8 +36,8 @@ for (const kind of ['indexeddb', 'localstorage']) {
 
     it('exports and re-imports training data', async () => {
       const store = await open();
-      for (const c of trainDomain('higuruma').slice(0, 4)) await store.putCapture(c);
-      await store.putMeta('domains', { higuruma: { verified: true } });
+      for (const c of trainDomain('megumi').slice(0, 4)) await store.putCapture(c);
+      await store.putMeta('domains', { megumi: { verified: true } });
       const json = await exportTraining(store);
       const parsed = JSON.parse(json);
       expect(parsed.format).toBe(EXPORT_FORMAT);
@@ -48,12 +48,12 @@ for (const kind of ['indexeddb', 'localstorage']) {
       const { usable, stale } = await loadCaptures(store);
       expect(usable).toHaveLength(4);
       expect(stale).toBe(0);
-      expect(await store.getMeta('domains')).toEqual({ higuruma: { verified: true } });
+      expect(await store.getMeta('domains')).toEqual({ megumi: { verified: true } });
     });
 
     it('rejects foreign or outdated exports', async () => {
       const store = await open();
-      await expect(importTraining(store, '{"format":"something-else"}')).rejects.toThrow(/not a Domain Permit/);
+      await expect(importTraining(store, '{"format":"something-else"}')).rejects.toThrow(/not a Domain Expansion/);
       await expect(importTraining(store, JSON.stringify({ format: EXPORT_FORMAT, featureVersion: 1, captures: [] }))).rejects.toThrow(/feature version 1/);
       await expect(importTraining(store, 'nope')).rejects.toThrow(/not valid JSON/);
     });

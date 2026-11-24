@@ -1,5 +1,4 @@
-// Tiny 3-vector helpers. Plain arrays keep the hot path allocation-light and
-// easy to read in tests.
+// 3-vector helpers, plain arrays.
 export const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 export const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 export const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
@@ -27,7 +26,7 @@ export const mean = (pts) => {
   return [s[0] / pts.length, s[1] / pts.length, s[2] / pts.length];
 };
 
-/** Angle between two vectors in radians, robust to zero length. */
+/** Angle between two vectors, radians. Returns 0 if either one is zero-length. */
 export function angleBetween(a, b) {
   const la = len(a);
   const lb = len(b);

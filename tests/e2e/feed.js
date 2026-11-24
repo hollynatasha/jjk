@@ -1,8 +1,7 @@
-// Injected into the page before the app loads (puppeteer evaluateOnNewDocument).
-// Replaces getUserMedia with a 640x480 canvas stream whose content the test
-// controls, so the real MediaPipe HandLandmarker sees real hand photos and the
-// whole pipeline (tracking -> features -> matcher -> gate -> cast) runs for real.
-// Also lets a test force camera errors. Never shipped in the app bundle.
+// Injected before the app loads (puppeteer evaluateOnNewDocument): getUserMedia
+// hands back a 640x480 canvas stream the test draws into, so the real
+// HandLandmarker runs on real photos. Set __feed.error to make it throw instead.
+// Never shipped in the app bundle.
 export function installFeed() {
   const W = 640;
   const H = 480;

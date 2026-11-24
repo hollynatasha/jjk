@@ -1,7 +1,5 @@
-// One coordinate transform for everything on the stage. The camera frame,
-// the segmentation mask, every landmark-anchored effect and the exported
-// footage all go through computeView(): a centred 9:16 crop of the raw camera
-// frame, mirrored exactly once for a front camera.
+// Everything on the stage goes through computeView(): a centred 9:16 crop of
+// the raw camera frame, mirrored exactly once for a front camera.
 
 export function computeView(videoW, videoH, W, H, mirror) {
   const target = W / H;
@@ -17,16 +15,23 @@ export function computeView(videoW, videoH, W, H, mirror) {
   return { videoW, videoH, cx: (videoW - cw) / 2, cy: (videoH - ch) / 2, cw, ch, scale: W / cw, mirror: !!mirror, W, H };
 }
 
-/** Normalised landmark (relative to the full raw frame) -> stage pixels. */
+/**
+ * Normalised landmark (relative to the full raw frame) -> stage pixels.
+ * k and ox place the view inside a scaled, centred box; the simulation uses
+ * them to keep 9:16 framing on a 16:9 stage. Both default to no-ops.
+ */
 export function toCanvas(view, nx, ny) {
   let x = (nx * view.videoW - view.cx) * view.scale;
   const y = (ny * view.videoH - view.cy) * view.scale;
   if (view.mirror) x = view.W - x;
-  return [x, y];
+  const k = view.k || 1;
+  return [x * k + (view.ox || 0), y * k];
 }
 
-/** Applies the same mapping to a 2D context, so drawImage(video, 0, 0, vw, vh) lands exactly where toCanvas says. */
+/** Same mapping on a 2D context: drawImage(video, 0, 0, vw, vh) then lands where toCanvas says. */
 export function applyVideoTransform(ctx, view) {
+  if (view.ox) ctx.translate(view.ox, 0);
+  if (view.k && view.k !== 1) ctx.scale(view.k, view.k);
   if (view.mirror) {
     ctx.translate(view.W, 0);
     ctx.scale(-1, 1);
@@ -35,7 +40,7 @@ export function applyVideoTransform(ctx, view) {
   ctx.translate(-view.cx, -view.cy);
 }
 
-/** The matrix applyVideoTransform builds, as [a, b, c, d, e, f] (for tests and debugging). */
+/** The matrix applyVideoTransform builds, as [a, b, c, d, e, f]. Tests use this. */
 export function viewMatrix(view) {
   const s = view.scale;
   const sx = view.mirror ? -s : s;
@@ -52,7 +57,6 @@ export function handsToCanvas(frame, view) {
   }));
 }
 
-/** Is a canvas point inside the visible stage? */
 export function onStage(view, p, margin = 0) {
   return p[0] >= -margin && p[0] <= view.W + margin && p[1] >= -margin && p[1] <= view.H + margin;
 }
